@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SavingsHub4u.com
 
-## Getting Started
+Blog-based homepage for a coupon & savings website. Built with Next.js 16, TypeScript, and Tailwind CSS.
 
-First, run the development server:
+## Features
+
+- **Blog-style homepage** – Hero featured article, 3 small featured posts, Most Popular Articles grid, Latest Articles grid
+- **TRENDING sidebar** – Right-hand sidebar with trending posts
+- **Footer** – Category columns (Fashion, Home & Garden, Lifestyle, Beauty) with article links
+- **Header** – Logo (SavingsHub4u), nav (NEWS, DEALS, REVIEWS, LIFESTYLE, BEAUTY), search & account icons
+- **Blog post pages** – `/blog/[slug]` for individual articles
+
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Admin area
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Login**: Go to [/admin/login](http://localhost:3000/admin/login) and enter the admin password.
+- **Protection**: Visiting [/admin](http://localhost:3000/admin) without being logged in redirects to `/admin/login`.
+- **Environment**: Create a `.env.local` file and set `ADMIN_PASSWORD=your-secret-password` (required for admin login).
 
-## Learn More
+## Project structure
 
-To learn more about Next.js, take a look at the following resources:
+- `src/app/` – App Router pages (home, blog slug)
+- `src/components/` – Header, Hero, ArticleCard, TrendingSidebar, Footer
+- `src/data/blog.ts` – Sample blog data (replace with CMS/API later)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Customize
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Content**: Edit `src/data/blog.ts` or connect a CMS (e.g. Supabase, Sanity).
+- **Images**: Currently using Unsplash. Update `next.config.ts` if you add other image domains.
+- **Styling**: Tailwind in `src/app/globals.css` and component classes.
 
-## Deploy on Vercel
+## Deploy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Vercel**: Connect this repo; Vercel will detect Next.js and build automatically.
+- **Custom domain**: Set `savingshub4u.com` in your hosting provider’s DNS and project settings.

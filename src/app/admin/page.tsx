@@ -1,0 +1,2217 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import type { Store } from "@/types/store";
+
+type Section = "dashboard" | "coupons" | "stores" | "analytics" | "tracking";
+
+const SIDEBAR_LINKS: { id: Section; label: string; icon: string }[] = [
+  { id: "dashboard", label: "Dashboard", icon: "◉" },
+  { id: "coupons", label: "Coupons", icon: "◇" },
+  { id: "stores", label: "Stores", icon: "▣" },
+  { id: "analytics", label: "Analytics", icon: "▤" },
+  { id: "tracking", label: "Click Tracking", icon: "◈" },
+];
+
+/** Parse one CSV line; handles quoted fields with commas. */
+function parseCSVLine(line: string): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === '"') {
+      let val = "";
+      i++;
+      while (i < line.length) {
+        if (line[i] === '"') {
+          i++;
+          if (line[i] === '"') { val += '"'; i++; }
+          else break;
+        } else { val += line[i]; i++; }
+      }
+      out.push(val.trim());
+      if (line[i] === ",") i++;
+    } else {
+      let val = "";
+      while (i < line.length && line[i] !== ",") { val += line[i]; i++; }
+      out.push(val.replace(/^"|"$/g, "").replace(/""/g, '"').trim());
+      if (line[i] === ",") i++;
+    }
+  }
+  return out;
+}
+
+export default function AdminPage() {
+  const [section, setSection] = useState<Section>("dashboard");
+  const [stores, setStores] = useState<Store[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [storeFilter, setStoreFilter] = useState<string>("all");
+  const [storeStatusFilter, setStoreStatusFilter] = useState<"all" | "enable" | "disable">("all");
+  const [storeSearch, setStoreSearch] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    logoUrl: "",
+    description: "",
+    expiry: "Dec 31, 2026",
+    link: "",
+  });
+  const [couponForm, setCouponForm] = useState({
+    selectedStoreId: "",
+    name: "",
+    couponType: "deal" as "code" | "deal",
+    couponCode: "",
+    couponTitle: "",
+    logoMethod: "url" as "url" | "upload",
+    logoUrl: "",
+    description: "",
+    link: "",
+    expiry: "",
+    imageAlt: "",
+    priority: 0,
+    active: true,
+  });
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [couponStatusFilter, setCouponStatusFilter] = useState<"all" | "enable" | "disable">("all");
+  const [couponSearch, setCouponSearch] = useState("");
+  const [couponPage, setCouponPage] = useState(1);
+  const [couponPerPage, setCouponPerPage] = useState(25);
+  const [storeForm, setStoreForm] = useState({
+    name: "",
+    subStoreName: "",
+    slug: "",
+    slugAuto: true,
+    logoMethod: "url" as "url" | "upload",
+    logoUrl: "",
+    logoAltText: "",
+    description: "",
+    networkId: "",
+    merchantId: "",
+    trackingUrl: "",
+    countryCodes: "",
+    websiteUrl: "",
+    category: "",
+    whyTrustUs: "",
+    moreInfo: "",
+    seoTitle: "",
+    seoMetaDesc: "",
+    trending: false,
+  });
+  const [showStoresCreateForm, setShowStoresCreateForm] = useState(false);
+  const [showCouponsCreateForm, setShowCouponsCreateForm] = useState(false);
+  const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
+  const [storePage, setStorePage] = useState(1);
+  const [storePerPage, setStorePerPage] = useState(25);
+  const [showUploadStoresModal, setShowUploadStoresModal] = useState(false);
+  const [showUploadLogosModal, setShowUploadLogosModal] = useState(false);
+  const [uploadStoresFile, setUploadStoresFile] = useState<File | null>(null);
+  const [uploadStoresPreview, setUploadStoresPreview] = useState<Record<string, string>[] | null>(null);
+  const [uploadStoresSubmitting, setUploadStoresSubmitting] = useState(false);
+  const [uploadLogoStoreId, setUploadLogoStoreId] = useState("");
+  const [uploadLogoUrl, setUploadLogoUrl] = useState("");
+  const [uploadLogoSubmitting, setUploadLogoSubmitting] = useState(false);
+  const [showUploadCouponsModal, setShowUploadCouponsModal] = useState(false);
+  const [uploadCouponsFile, setUploadCouponsFile] = useState<File | null>(null);
+  const [uploadCouponsPreview, setUploadCouponsPreview] = useState<Record<string, string>[] | null>(null);
+  const [uploadCouponsSubmitting, setUploadCouponsSubmitting] = useState(false);
+
+  const [analytics, setAnalytics] = useState<{
+    totalClicks: number;
+    clicksToday: number;
+    clicksThisWeek: number;
+    byStore: { storeId: string; storeName: string; count: number }[];
+    topCoupons: { storeId: string; code: string; uses: number; pct: string }[];
+    totalCoupons: number;
+    codesCount: number;
+    dealsCount: number;
+    avgUsageRate: string;
+  } | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  const fetchStores = async () => {
+    try {
+      const res = await fetch("/api/stores");
+      const data = await res.json();
+      setStores(Array.isArray(data) ? data : []);
+    } catch {
+      setStores([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    setAnalyticsLoading(true);
+    try {
+      const res = await fetch("/api/analytics");
+      const data = await res.json();
+      setAnalytics({
+        totalClicks: data.totalClicks ?? 0,
+        clicksToday: data.clicksToday ?? 0,
+        clicksThisWeek: data.clicksThisWeek ?? 0,
+        byStore: Array.isArray(data.byStore) ? data.byStore : [],
+        topCoupons: Array.isArray(data.topCoupons) ? data.topCoupons : [],
+        totalCoupons: data.totalCoupons ?? 0,
+        codesCount: data.codesCount ?? 0,
+        dealsCount: data.dealsCount ?? 0,
+        avgUsageRate: data.avgUsageRate ?? "0.0",
+      });
+    } catch {
+      setAnalytics(null);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStores();
+  }, []);
+
+  useEffect(() => {
+    if (section === "analytics") fetchAnalytics();
+  }, [section]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/stores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          logoUrl: form.logoUrl.trim() || undefined,
+          description: form.description.trim(),
+          expiry: form.expiry.trim() || "Dec 31, 2026",
+          link: form.link.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to add store");
+      }
+      setMessage({ type: "success", text: "Store / coupon added successfully." });
+      setForm({ name: "", logoUrl: "", description: "", expiry: "Dec 31, 2026", link: "" });
+      await fetchStores();
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Something went wrong." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filteredStores =
+    storeFilter === "all" ? stores : stores.filter((s) => s.name === storeFilter);
+  const totalCoupons = stores.length;
+  const activeCoupons = stores.length;
+
+  const storesByStatus =
+    storeStatusFilter === "all"
+      ? stores
+      : storeStatusFilter === "enable"
+        ? stores.filter((s) => s.status !== "disable")
+        : stores.filter((s) => s.status === "disable");
+  const storesFilteredBySearch =
+    !storeSearch.trim()
+      ? storesByStatus
+      : storesByStatus.filter((s) =>
+          s.name.toLowerCase().includes(storeSearch.trim().toLowerCase())
+        );
+  const storeTotal = storesFilteredBySearch.length;
+  const storePaginated = storesFilteredBySearch.slice(
+    (storePage - 1) * storePerPage,
+    storePage * storePerPage
+  );
+
+  const couponFiltered =
+    couponStatusFilter === "all"
+      ? stores
+      : couponStatusFilter === "enable"
+        ? stores.filter((s) => s.status !== "disable")
+        : stores.filter((s) => s.status === "disable");
+  const couponSearched = !couponSearch.trim()
+    ? couponFiltered
+    : couponFiltered.filter(
+        (s) =>
+          s.name.toLowerCase().includes(couponSearch.trim().toLowerCase()) ||
+          s.id.toLowerCase().includes(couponSearch.trim().toLowerCase())
+      );
+  const couponTotal = couponSearched.length;
+  const couponPaginated = couponSearched.slice(
+    (couponPage - 1) * couponPerPage,
+    couponPage * couponPerPage
+  );
+
+  const handleCouponSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setSubmitting(true);
+    try {
+      if (editingCouponId) {
+        const res = await fetch("/api/stores", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingCouponId,
+            name: couponForm.name.trim(),
+            description: couponForm.description.trim(),
+            expiry: couponForm.expiry.trim() || "Dec 31, 2026",
+            link: couponForm.link.trim() || undefined,
+            logoUrl: couponForm.logoUrl.trim() || undefined,
+            couponType: couponForm.couponType,
+            couponCode: couponForm.couponCode.trim() || undefined,
+            couponTitle: couponForm.couponTitle.trim() || undefined,
+            priority: couponForm.priority,
+            active: couponForm.active,
+            imageAlt: couponForm.imageAlt.trim() || undefined,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Failed to update coupon");
+        }
+        setMessage({ type: "success", text: "Coupon updated successfully." });
+        setEditingCouponId(null);
+        setShowCouponsCreateForm(false);
+      } else {
+        const res = await fetch("/api/stores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: couponForm.name.trim(),
+            description: couponForm.description.trim(),
+            expiry: couponForm.expiry.trim() || "Dec 31, 2026",
+            link: couponForm.link.trim() || undefined,
+            logoUrl: couponForm.logoUrl.trim() || undefined,
+            couponType: couponForm.couponType,
+            couponCode: couponForm.couponCode.trim() || undefined,
+            couponTitle: couponForm.couponTitle.trim() || undefined,
+            priority: couponForm.priority,
+            active: couponForm.active,
+            imageAlt: couponForm.imageAlt.trim() || undefined,
+            status: couponForm.active ? "enable" : "disable",
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Failed to create coupon");
+        }
+        setMessage({ type: "success", text: "Coupon created successfully." });
+        setShowCouponsCreateForm(false);
+      }
+      setCouponForm({
+        selectedStoreId: "",
+        name: "",
+        couponType: "deal",
+        couponCode: "",
+        couponTitle: "",
+        logoMethod: "url",
+        logoUrl: "",
+        description: "",
+        link: "",
+        expiry: "",
+        imageAlt: "",
+        priority: 0,
+        active: true,
+      });
+      await fetchStores();
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Something went wrong." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteCoupon = async (id: string) => {
+    if (!confirm("Delete this coupon?")) return;
+    try {
+      const res = await fetch(`/api/stores?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      await fetchStores();
+      if (editingCouponId === id) {
+        setEditingCouponId(null);
+        setShowCouponsCreateForm(false);
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to delete coupon." });
+    }
+  };
+
+  const handleDeleteAllCoupons = async () => {
+    if (!confirm("Delete ALL coupons? This cannot be undone.")) return;
+    try {
+      const res = await fetch("/api/stores?all=true", { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete all");
+      await fetchStores();
+      setShowCouponsCreateForm(false);
+      setEditingCouponId(null);
+      setMessage({ type: "success", text: "All coupons deleted." });
+    } catch {
+      setMessage({ type: "error", text: "Failed to delete all coupons." });
+    }
+  };
+
+  const startEditCoupon = (store: Store) => {
+    setEditingCouponId(store.id);
+    setCouponForm({
+      selectedStoreId: "",
+      name: store.name,
+      couponType: (store.couponType as "code" | "deal") || "deal",
+      couponCode: store.couponCode ?? "",
+      couponTitle: store.couponTitle ?? "",
+      logoMethod: "url",
+      logoUrl: store.logoUrl ?? "",
+      description: store.description ?? "",
+      link: store.link ?? "",
+      expiry: store.expiry ?? "",
+      imageAlt: store.imageAlt ?? store.logoAltText ?? "",
+      priority: store.priority ?? 0,
+      active: store.active !== false,
+    });
+    setSection("coupons");
+    setShowCouponsCreateForm(true);
+  };
+
+  const handleStoreSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setSubmitting(true);
+    try {
+      const slug = storeForm.slugAuto
+        ? storeForm.name
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "-")
+            .replace(/[^a-z0-9-]/g, "")
+        : storeForm.slug.trim();
+      if (editingStoreId) {
+        const res = await fetch("/api/stores", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingStoreId,
+            name: storeForm.name.trim(),
+            description: storeForm.description.trim() || storeForm.name.trim(),
+            subStoreName: storeForm.subStoreName.trim() || undefined,
+            slug: slug || undefined,
+            logoUrl: storeForm.logoUrl.trim() || undefined,
+            logoAltText: storeForm.logoAltText.trim() || undefined,
+            logoMethod: storeForm.logoMethod,
+            networkId: storeForm.networkId.trim() || undefined,
+            merchantId: storeForm.merchantId.trim() || undefined,
+            trackingUrl: storeForm.trackingUrl.trim() || undefined,
+            link: storeForm.trackingUrl.trim() || undefined,
+            countryCodes: storeForm.countryCodes.trim() || undefined,
+            websiteUrl: storeForm.websiteUrl.trim() || undefined,
+            category: storeForm.category.trim() || undefined,
+            whyTrustUs: storeForm.whyTrustUs.trim() || undefined,
+            moreInfo: storeForm.moreInfo.trim() || undefined,
+            seoTitle: storeForm.seoTitle.trim() || undefined,
+            seoMetaDesc: storeForm.seoMetaDesc.trim() || undefined,
+            trending: storeForm.trending,
+            status: "enable",
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Failed to update store");
+        }
+        setMessage({ type: "success", text: "Store updated successfully." });
+        setEditingStoreId(null);
+      } else {
+        const res = await fetch("/api/stores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: storeForm.name.trim(),
+            description: storeForm.description.trim() || storeForm.name.trim(),
+            expiry: "Dec 31, 2026",
+            subStoreName: storeForm.subStoreName.trim() || undefined,
+            slug: slug || undefined,
+            logoUrl: storeForm.logoUrl.trim() || undefined,
+            logoAltText: storeForm.logoAltText.trim() || undefined,
+            logoMethod: storeForm.logoMethod,
+            networkId: storeForm.networkId.trim() || undefined,
+            merchantId: storeForm.merchantId.trim() || undefined,
+            trackingUrl: storeForm.trackingUrl.trim() || undefined,
+            link: storeForm.trackingUrl.trim() || undefined,
+            countryCodes: storeForm.countryCodes.trim() || undefined,
+            websiteUrl: storeForm.websiteUrl.trim() || undefined,
+            category: storeForm.category.trim() || undefined,
+            whyTrustUs: storeForm.whyTrustUs.trim() || undefined,
+            moreInfo: storeForm.moreInfo.trim() || undefined,
+            seoTitle: storeForm.seoTitle.trim() || undefined,
+            seoMetaDesc: storeForm.seoMetaDesc.trim() || undefined,
+            trending: storeForm.trending,
+            status: "enable",
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Failed to create store");
+        }
+        setMessage({ type: "success", text: "Store created successfully." });
+      }
+      setStoreForm({
+        name: "",
+        subStoreName: "",
+        slug: "",
+        slugAuto: true,
+        logoMethod: "url",
+        logoUrl: "",
+        logoAltText: "",
+        description: "",
+        networkId: "",
+        merchantId: "",
+        trackingUrl: "",
+        countryCodes: "",
+        websiteUrl: "",
+        category: "",
+        whyTrustUs: "",
+        moreInfo: "",
+        seoTitle: "",
+        seoMetaDesc: "",
+        trending: false,
+      });
+      await fetchStores();
+      if (editingStoreId) setShowStoresCreateForm(false);
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Something went wrong." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen bg-stone-100 text-stone-900">
+      {/* Sidebar - classical dark */}
+      <aside className="flex w-56 shrink-0 flex-col border-r border-stone-300 bg-stone-800 text-stone-100">
+        <div className="border-b border-stone-600 px-4 py-5">
+          <Link href="/" className="text-lg font-semibold tracking-tight text-white">
+            Admin Panel
+          </Link>
+        </div>
+        <nav className="flex-1 space-y-0.5 p-3">
+          {SIDEBAR_LINKS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setSection(item.id)}
+              className={`flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                section === item.id
+                  ? "border-amber-600/60 bg-amber-900/30 text-amber-200"
+                  : "border-transparent text-stone-300 hover:border-stone-600 hover:bg-stone-700/50 hover:text-white"
+              }`}
+            >
+              <span className="text-base opacity-80">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="border-t border-stone-600 p-3">
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch("/api/admin/logout", { method: "POST" });
+              window.location.href = "/admin/login";
+            }}
+            className="flex w-full items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-left text-sm font-medium text-stone-400 transition-colors hover:border-stone-600 hover:bg-stone-700/50 hover:text-white"
+          >
+            <span>↪</span> Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-auto">
+        <header className="sticky top-0 z-10 border-b border-stone-300 bg-stone-50/95 px-6 py-4 shadow-sm backdrop-blur">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-stone-500">Welcome back</p>
+            <Link
+              href="/promotions"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-400 hover:bg-stone-50"
+            >
+              View Promotions Page →
+            </Link>
+          </div>
+        </header>
+
+        <div className="p-6">
+          {/* Dashboard */}
+          {section === "dashboard" && (
+            <>
+              <h1 className="mb-6 font-serif text-2xl font-bold text-stone-900">Dashboard</h1>
+
+              <section className="mb-8">
+                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
+                  <span>⚡</span> Quick Actions
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    { label: "Bulk import stores & coupons", sub: "Import Excel", onClick: () => {} },
+                    { label: "View & edit all stores", sub: "Manage Stores", onClick: () => setSection("stores") },
+                    { label: "View & edit all coupons", sub: "Manage Coupons", onClick: () => setSection("coupons") },
+                    { label: "Track coupon clicks by location", sub: "Click Analytics", onClick: () => setSection("analytics") },
+                  ].map((action, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={action.onClick}
+                      className="rounded-lg border-2 border-stone-300 bg-white p-4 text-left shadow-sm transition hover:border-amber-500/50 hover:bg-amber-50/30 hover:shadow"
+                    >
+                      <span className="block text-xs font-medium uppercase tracking-wide text-stone-500">
+                        {action.sub}
+                      </span>
+                      <span className="mt-1 block text-sm font-semibold text-stone-800">
+                        {action.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="mb-6">
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
+                  Search Coupons by Store
+                </h2>
+                <select
+                  value={storeFilter}
+                  onChange={(e) => setStoreFilter(e.target.value)}
+                  className="rounded border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 shadow-sm focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                >
+                  <option value="all">All Stores</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </section>
+
+              <section className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: "Total Coupons", value: totalCoupons, color: "text-blue-700" },
+                  { label: "Active Coupons", value: activeCoupons, color: "text-emerald-700" },
+                  { label: "Total Uses", value: "0", color: "text-violet-700" },
+                  { label: "Avg Discount", value: "0.00%", color: "text-emerald-700" },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="rounded-lg border border-stone-300 bg-white p-4 shadow-sm"
+                  >
+                    <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                      {stat.label}
+                    </p>
+                    <p className={`mt-1 font-serif text-2xl font-bold ${stat.color}`}>
+                      {stat.value}
+                    </p>
+                  </div>
+                ))}
+              </section>
+
+              <section>
+                <h2 className="mb-3 font-serif text-lg font-semibold text-stone-900">
+                  Recent Coupons
+                </h2>
+                <div className="overflow-hidden rounded-lg border border-stone-300 bg-white shadow-sm">
+                  {loading ? (
+                    <div className="p-8 text-center text-sm text-stone-500">Loading...</div>
+                  ) : filteredStores.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-stone-500">
+                      No coupons yet. Add one from Coupons.
+                    </div>
+                  ) : (
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-200 bg-stone-50">
+                          <th className="px-4 py-3 text-left font-semibold text-stone-700">
+                            Store Name
+                          </th>
+                          <th className="px-4 py-3 text-left font-semibold text-stone-700">
+                            Code / Deal
+                          </th>
+                          <th className="px-4 py-3 text-left font-semibold text-stone-700">
+                            Discount
+                          </th>
+                          <th className="px-4 py-3 text-left font-semibold text-stone-700">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 text-left font-semibold text-stone-700">
+                            Expiry
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStores.slice(0, 10).map((store) => (
+                          <tr
+                            key={store.id}
+                            className="border-b border-stone-100 hover:bg-stone-50/50"
+                          >
+                            <td className="px-4 py-3 font-medium text-stone-900">{store.name}</td>
+                            <td className="px-4 py-3 text-stone-600">{store.description}</td>
+                            <td className="px-4 py-3 text-stone-500">—</td>
+                            <td className="px-4 py-3">
+                              <span className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                                Active
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-stone-500">{store.expiry}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* Coupons - Manage Coupons page */}
+          {section === "coupons" && (
+            <>
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h1 className="font-serif text-2xl font-bold text-stone-900">Manage Coupons</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ["Coupon ID", "Store Name", "Store ID", "Title", "Code", "Description", "Expiry Date", "Status"];
+                      const rows = couponSearched.map((s) => [
+                        s.id,
+                        s.name,
+                        s.id,
+                        s.couponTitle ?? "",
+                        s.couponCode ?? "",
+                        s.description ?? "",
+                        s.expiry ?? "",
+                        s.status === "disable" ? "Disable" : "Active",
+                      ].map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","));
+                      const csv = [headers.join(","), ...rows].join("\n");
+                      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `coupons-export-${new Date().toISOString().slice(0, 10)}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }}
+                    className="rounded border border-stone-300 bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+                  >
+                    Export Coupons (CSV)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadCouponsModal(true)}
+                    className="rounded border border-stone-300 bg-amber-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-amber-700"
+                  >
+                    Upload Coupons
+                  </button>
+                  {showCouponsCreateForm ? (
+                    <button
+                      type="button"
+                      onClick={() => { setShowCouponsCreateForm(false); setEditingCouponId(null); setMessage(null); }}
+                      className="rounded border border-stone-300 bg-stone-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-stone-700"
+                    >
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowCouponsCreateForm(true)}
+                      className="rounded border border-stone-300 bg-sky-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+                    >
+                      Create New Coupon
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllCoupons}
+                    className="rounded border border-stone-300 bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-red-700"
+                  >
+                    Delete All Coupons
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-6 flex flex-wrap items-center gap-6 rounded-lg border border-stone-300 bg-white p-4 shadow-sm">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Store name or Store ID (e.g. efarma or 190)..."
+                    value={couponSearch}
+                    onChange={(e) => setCouponSearch(e.target.value)}
+                    className="w-full rounded border border-stone-300 py-2 pl-9 pr-3 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                  />
+                </div>
+                <fieldset className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-stone-600">Status Filter:</span>
+                  {(["all", "enable", "disable"] as const).map((status) => (
+                    <label key={status} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="couponStatus"
+                        checked={couponStatusFilter === status}
+                        onChange={() => setCouponStatusFilter(status)}
+                        className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm capitalize text-stone-700">{status}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
+
+              {!showCouponsCreateForm && (
+                <>
+                  <div className="overflow-x-auto rounded-lg border border-stone-300 bg-white shadow-sm">
+                    {loading ? (
+                      <div className="p-8 text-center text-sm text-stone-500">Loading…</div>
+                    ) : couponPaginated.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-stone-500">No coupons yet. Create one or import.</div>
+                    ) : (
+                      <table className="w-full border-collapse text-sm">
+                        <thead>
+                          <tr className="border-b border-stone-200 bg-stone-50">
+                            <th className="w-10 px-3 py-2 text-left font-semibold text-stone-700">
+                              <input type="checkbox" className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" aria-label="Select all" />
+                            </th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Coupon ID</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Store Name</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Store ID</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Title</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Code</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Description</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Expiry Date</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Status</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {couponPaginated.map((row) => (
+                            <tr key={row.id} className="border-b border-stone-100 hover:bg-stone-50/50">
+                              <td className="w-10 px-3 py-2">
+                                <input type="checkbox" className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" aria-label={`Select ${row.name}`} />
+                              </td>
+                              <td className="px-3 py-2 font-mono text-xs text-stone-600">{row.id.slice(0, 8)}</td>
+                              <td className="px-3 py-2 font-medium text-stone-900">{row.name}</td>
+                              <td className="px-3 py-2 font-mono text-xs text-stone-500">{row.id.slice(0, 8)}</td>
+                              <td className="px-3 py-2 text-stone-700">{row.couponTitle ?? "—"}</td>
+                              <td className="px-3 py-2 font-medium text-stone-700">{row.couponCode ?? "N/A"}</td>
+                              <td className="max-w-[180px] truncate px-3 py-2 text-stone-600" title={row.description ?? ""}>{row.description?.trim() || "—"}</td>
+                              <td className="px-3 py-2 text-stone-500">{row.expiry}</td>
+                              <td className="px-3 py-2">
+                                <span className={`rounded border px-2 py-0.5 text-xs font-medium ${row.status === "disable" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-300 bg-emerald-50 text-emerald-800"}`}>
+                                  {row.status === "disable" ? "Disable" : "Active"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() => startEditCoupon(row)}
+                                  className="rounded border border-sky-600 bg-sky-600 px-2 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCoupon(row.id)}
+                                  className="ml-1 rounded border border-red-600 bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                  {couponTotal > 0 && (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 pt-4">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm text-stone-600">
+                          Items per page
+                          <select
+                            value={couponPerPage}
+                            onChange={(e) => {
+                              setCouponPerPage(Number(e.target.value));
+                              setCouponPage(1);
+                            }}
+                            className="rounded border border-stone-300 px-2 py-1 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                          </select>
+                        </label>
+                        <span className="text-sm text-stone-500">
+                          Showing {(couponPage - 1) * couponPerPage + 1}-{Math.min(couponPage * couponPerPage, couponTotal)} of {couponTotal}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          disabled={couponPage <= 1}
+                          onClick={() => setCouponPage((p) => p - 1)}
+                          className="rounded border border-stone-300 px-3 py-1 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          type="button"
+                          disabled={couponPage * couponPerPage >= couponTotal}
+                          onClick={() => setCouponPage((p) => p + 1)}
+                          className="rounded border border-stone-300 px-3 py-1 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {showCouponsCreateForm && (
+              <section className="mb-8 rounded-lg border border-stone-300 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 font-serif text-lg font-semibold text-stone-900">{editingCouponId ? "Edit Coupon" : "Create New Coupon"}</h2>
+                {message && section === "coupons" && (
+                  <div
+                    className={`mb-4 rounded border px-4 py-3 text-sm ${
+                      message.type === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-red-200 bg-red-50 text-red-800"
+                    }`}
+                  >
+                    {message.text}
+                  </div>
+                )}
+                <form onSubmit={handleCouponSubmit} className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-stone-700">Select Store (Optional)</label>
+                    <select
+                      value={couponForm.selectedStoreId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setCouponForm((f) => ({
+                          ...f,
+                          selectedStoreId: id,
+                          name: id ? (stores.find((s) => s.id === id)?.name ?? f.name) : f.name,
+                        }));
+                      }}
+                      className="w-full max-w-xs rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    >
+                      <option value="">— Add new store —</option>
+                      {stores.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-stone-700">Coupon Type</label>
+                    <div className="flex gap-4">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="radio"
+                          name="couponType"
+                          checked={couponForm.couponType === "code"}
+                          onChange={() => setCouponForm((f) => ({ ...f, couponType: "code" }))}
+                          className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-stone-700">Code</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="radio"
+                          name="couponType"
+                          checked={couponForm.couponType === "deal"}
+                          onChange={() => setCouponForm((f) => ({ ...f, couponType: "deal" }))}
+                          className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-stone-700">Deal</span>
+                      </label>
+                    </div>
+                    <p className="mt-1 text-xs text-stone-500">Select whether this is a coupon code or a deal. Frontend will show &quot;Get Code&quot; for codes and &quot;Get Deal&quot; for deals.</p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Store Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={couponForm.name}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="e.g. Nike, Walmart"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">
+                        Coupon Code {couponForm.couponType === "code" ? "*" : "(Optional)"}
+                      </label>
+                      <input
+                        type="text"
+                        required={couponForm.couponType === "code"}
+                        value={couponForm.couponCode}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, couponCode: e.target.value }))}
+                        placeholder="e.g. SAVE20"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-stone-700">Coupon Title (Optional)</label>
+                    <input
+                      type="text"
+                      value={couponForm.couponTitle}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, couponTitle: e.target.value }))}
+                      placeholder="e.g. 20% Off Sitewide"
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-stone-700">Logo Upload Method</label>
+                    <div className="flex gap-4">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="radio"
+                          name="couponLogoMethod"
+                          checked={couponForm.logoMethod === "upload"}
+                          onChange={() => setCouponForm((f) => ({ ...f, logoMethod: "upload" }))}
+                          className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-stone-700">File Upload</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="radio"
+                          name="couponLogoMethod"
+                          checked={couponForm.logoMethod === "url"}
+                          onChange={() => setCouponForm((f) => ({ ...f, logoMethod: "url" }))}
+                          className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-stone-700">URL (Cloudinary)</span>
+                      </label>
+                    </div>
+                    {couponForm.logoMethod === "url" && (
+                      <input
+                        type="url"
+                        value={couponForm.logoUrl}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                        placeholder="https://..."
+                        className="mt-2 w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-stone-700">Description *</label>
+                    <textarea
+                      required
+                      value={couponForm.description}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="Coupon or deal description"
+                      rows={3}
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-stone-700">Coupon URL (Where user is redirected when clicking &quot;Get Deal&quot;)</label>
+                    <input
+                      type="url"
+                      value={couponForm.link}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, link: e.target.value }))}
+                      placeholder="https://example.com/coupon-page"
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Expiry Date (Optional)</label>
+                      <input
+                        type="text"
+                        value={couponForm.expiry}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, expiry: e.target.value }))}
+                        placeholder="mm/dd/yyyy or Dec 31, 2026"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Coupon Image Alt</label>
+                      <input
+                        type="text"
+                        value={couponForm.imageAlt}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, imageAlt: e.target.value }))}
+                        placeholder="Alt text for accessibility and SEO"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-6">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Coupon Priority</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={couponForm.priority}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, priority: Number(e.target.value) || 0 }))}
+                        className="w-24 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">Higher priority shown first.</p>
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 pt-6">
+                      <input
+                        type="checkbox"
+                        checked={couponForm.active}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, active: e.target.checked }))}
+                        className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm font-medium text-stone-700">Active</span>
+                    </label>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="rounded border-2 border-sky-600 bg-sky-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    {submitting
+                      ? (editingCouponId ? "Updating..." : "Creating...")
+                      : editingCouponId
+                        ? "Update Coupon"
+                        : "Create Coupon"}
+                  </button>
+                  {editingCouponId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCouponId(null);
+                        setCouponForm({
+                          selectedStoreId: "",
+                          name: "",
+                          couponType: "deal",
+                          couponCode: "",
+                          couponTitle: "",
+                          logoMethod: "url",
+                          logoUrl: "",
+                          description: "",
+                          link: "",
+                          expiry: "",
+                          imageAlt: "",
+                          priority: 0,
+                          active: true,
+                        });
+                      }}
+                      className="ml-3 rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </form>
+              </section>
+              )}
+
+              {/* Upload Coupons Modal */}
+              {showUploadCouponsModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4" onClick={() => !uploadCouponsSubmitting && setShowUploadCouponsModal(false)}>
+                  <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-stone-300 bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                    <h3 className="mb-4 font-serif text-xl font-bold text-stone-900">Upload Coupons (CSV)</h3>
+                    <p className="mb-4 text-sm text-stone-600">Upload a CSV with columns: <strong>name</strong> (Store Name), <strong>description</strong>, <strong>type</strong> (code or deal), <strong>couponCode</strong> / <strong>code</strong>, <strong>couponTitle</strong> / <strong>title</strong>, <strong>expiry</strong>, <strong>link</strong>, <strong>logoUrl</strong>. First row = headers.</p>
+                    <div className="mb-4">
+                      <label className="mb-2 block text-sm font-medium text-stone-700">Choose CSV file</label>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 file:mr-2 file:rounded file:border-0 file:bg-amber-100 file:px-3 file:py-1 file:text-amber-800"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setUploadCouponsFile(f);
+                          const text = await f.text();
+                          const lines = text.split(/\r?\n/).filter(Boolean);
+                          const rawHeaders = parseCSVLine(lines[0]).map((h) => h.replace(/^"|"$/g, "").trim());
+                          const norm = (k: string) => k.toLowerCase().replace(/\s+/g, "");
+                          const headerMap: Record<string, string> = { name: "name", storename: "name", description: "description", desc: "description", details: "description", type: "couponType", coupontype: "couponType", couponcode: "couponCode", code: "couponCode", coupontitle: "couponTitle", title: "couponTitle", expiry: "expiry", link: "link", logourl: "logoUrl", logo: "logoUrl" };
+                          const headers = rawHeaders.map((h) => headerMap[norm(h)] ?? norm(h));
+                          const start = 1;
+                          const preview: Record<string, string>[] = [];
+                          for (let i = start; i < Math.min(lines.length, start + 6); i++) {
+                            const vals = parseCSVLine(lines[i]);
+                            const row: Record<string, string> = {};
+                            headers.forEach((h, j) => { if (h) row[h] = (vals[j] || "").trim(); });
+                            preview.push(row);
+                          }
+                          setUploadCouponsPreview(preview);
+                        }}
+                      />
+                    </div>
+                    {uploadCouponsPreview && uploadCouponsPreview.length > 0 && (
+                      <div className="mb-4 overflow-x-auto rounded border border-stone-200 bg-stone-50 p-2 text-xs">
+                        <p className="mb-2 font-medium text-stone-700">Preview (first rows)</p>
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="border-b border-stone-300">
+                              {Object.keys(uploadCouponsPreview[0]).map((k) => <th key={k} className="px-2 py-1 text-left font-medium text-stone-600">{k}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {uploadCouponsPreview.map((row, i) => (
+                              <tr key={i} className="border-b border-stone-100">
+                                {Object.values(row).map((v, j) => <td key={j} className="max-w-[120px] truncate px-2 py-1 text-stone-700" title={String(v)}>{String(v)}</td>)}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => { setShowUploadCouponsModal(false); setUploadCouponsFile(null); setUploadCouponsPreview(null); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">Cancel</button>
+                      <button
+                        type="button"
+                        disabled={!uploadCouponsFile || uploadCouponsSubmitting}
+                        className="rounded border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                        onClick={async () => {
+                          if (!uploadCouponsFile) return;
+                          setUploadCouponsSubmitting(true);
+                          setMessage(null);
+                          try {
+                            const text = await uploadCouponsFile.text();
+                            const lines = text.split(/\r?\n/).filter(Boolean);
+                            const rawHeaders = parseCSVLine(lines[0]).map((h) => h.replace(/^"|"$/g, "").trim());
+                            const norm = (k: string) => k.toLowerCase().replace(/\s+/g, "");
+                            const headerMap: Record<string, string> = { name: "name", storename: "name", description: "description", desc: "description", details: "description", type: "couponType", coupontype: "couponType", couponcode: "couponCode", code: "couponCode", coupontitle: "couponTitle", title: "couponTitle", expiry: "expiry", link: "link", logourl: "logoUrl", logo: "logoUrl" };
+                            const headers = rawHeaders.map((h) => headerMap[norm(h)] ?? norm(h));
+                            const start = 1;
+                            const stores: Record<string, string>[] = [];
+                            for (let i = start; i < lines.length; i++) {
+                              const vals = parseCSVLine(lines[i]);
+                              const row: Record<string, string> = {};
+                              headers.forEach((h, j) => { if (h) row[h] = (vals[j] || "").trim(); });
+                              const desc = (row.description || row.desc || row.details || row.name || "").trim();
+                              const typeVal = (row.couponType || "").toLowerCase();
+                              if (row.name) stores.push({ ...row, description: desc || row.name, couponType: typeVal === "code" ? "code" : typeVal === "deal" ? "deal" : undefined });
+                            }
+                            const res = await fetch("/api/stores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stores }) });
+                            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Import failed"); }
+                            const data = await res.json();
+                            setMessage({ type: "success", text: `Imported ${data.imported ?? stores.length} coupon(s).` });
+                            setShowUploadCouponsModal(false);
+                            setUploadCouponsFile(null);
+                            setUploadCouponsPreview(null);
+                            await fetchStores();
+                          } catch (e) {
+                            setMessage({ type: "error", text: e instanceof Error ? e.message : "Import failed." });
+                          } finally {
+                            setUploadCouponsSubmitting(false);
+                          }
+                        }}
+                      >
+                        {uploadCouponsSubmitting ? "Importing…" : "Import Coupons"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Stores - Manage Stores page */}
+          {section === "stores" && (
+            <>
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h1 className="font-serif text-2xl font-bold text-stone-900">Manage Stores</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const headers = ["Store Name", "Description", "Logo URL", "Slug", "Merchant ID", "Network ID", "Tracking URL", "Country Codes", "Website URL", "Category"];
+                      const rows = storesFilteredBySearch.map((s) => [
+                        s.name,
+                        s.description ?? "",
+                        s.logoUrl ?? "",
+                        s.slug ?? "",
+                        s.merchantId ?? "",
+                        s.networkId ?? "",
+                        s.trackingUrl ?? "",
+                        s.countryCodes ?? "",
+                        s.websiteUrl ?? "",
+                        s.category ?? "",
+                      ].map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","));
+                      const csv = [headers.join(","), ...rows].join("\n");
+                      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `stores-export-${new Date().toISOString().slice(0, 10)}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }}
+                    className="rounded border border-stone-300 bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+                  >
+                    Export Stores (CSV)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadLogosModal(true)}
+                    className="rounded border border-stone-300 bg-violet-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+                  >
+                    Upload Logos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadStoresModal(true)}
+                    className="rounded border border-stone-300 bg-amber-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-amber-700"
+                  >
+                    Upload Stores
+                  </button>
+                  {showStoresCreateForm ? (
+                    <button
+                      type="button"
+                      onClick={() => { setShowStoresCreateForm(false); setEditingStoreId(null); setMessage(null); }}
+                      className="rounded border border-stone-300 bg-stone-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-stone-700"
+                    >
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowStoresCreateForm(true)}
+                      className="rounded border border-stone-300 bg-sky-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+                    >
+                      Create New Store
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`Delete ALL ${stores.length} store(s)? This cannot be undone.`)) return;
+                      setMessage(null);
+                      try {
+                        const res = await fetch("/api/stores?all=true", { method: "DELETE" });
+                        if (!res.ok) throw new Error("Failed");
+                        const data = await res.json().catch(() => ({}));
+                        setMessage({ type: "success", text: `Deleted ${data.deleted ?? stores.length} store(s).` });
+                        setShowStoresCreateForm(false);
+                        setEditingStoreId(null);
+                        await fetchStores();
+                      } catch {
+                        setMessage({ type: "error", text: "Failed to delete all stores." });
+                      }
+                    }}
+                    disabled={stores.length === 0}
+                    className="rounded border border-red-600 bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Delete All Stores
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-6 flex flex-wrap items-center gap-6 rounded-lg border border-stone-300 bg-white p-4 shadow-sm">
+                <fieldset className="flex items-center gap-4">
+                  <span className="text-sm font-medium text-stone-600">Status:</span>
+                  {(["all", "enable", "disable"] as const).map((status) => (
+                    <label key={status} className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="storeStatus"
+                        checked={storeStatusFilter === status}
+                        onChange={() => setStoreStatusFilter(status)}
+                        className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm capitalize text-stone-700">{status}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Enter store name"
+                    value={storeSearch}
+                    onChange={(e) => setStoreSearch(e.target.value)}
+                    className="w-full rounded border border-stone-300 py-2 pl-9 pr-3 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                  />
+                </div>
+              </div>
+
+              {!showStoresCreateForm && (
+                <>
+                  <div className="overflow-x-auto rounded-lg border border-stone-300 bg-white shadow-sm">
+                    {loading ? (
+                      <div className="p-8 text-center text-sm text-stone-500">Loading stores…</div>
+                    ) : storePaginated.length === 0 ? (
+                      <div className="p-8 text-center text-sm text-stone-500">No stores yet. Create one or upload a CSV.</div>
+                    ) : (
+                      <table className="w-full border-collapse text-sm">
+                        <thead>
+                          <tr className="border-b border-stone-200 bg-stone-50">
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Store ID</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Merchant ID</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Logo</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Store Name</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Slug</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Network ID</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Country</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Category</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Tracking Link</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Coupons</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {storePaginated.map((s) => (
+                            <tr key={s.id} className="border-b border-stone-100 hover:bg-stone-50/50">
+                              <td className="px-3 py-2 font-mono text-xs text-stone-600">{s.id.slice(0, 8)}</td>
+                              <td className="px-3 py-2 font-mono text-xs text-stone-600">{s.merchantId ?? "—"}</td>
+                              <td className="px-3 py-2">
+                                {s.logoUrl ? (
+                                  <img src={s.logoUrl} alt={s.logoAltText ?? s.name} className="h-8 w-8 rounded object-contain" />
+                                ) : (
+                                  <span className="text-stone-400">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 font-medium text-stone-900">{s.name}</td>
+                              <td className="px-3 py-2 text-stone-600">{s.slug ?? "—"}</td>
+                              <td className="px-3 py-2 text-stone-600">{s.networkId ?? "—"}</td>
+                              <td className="px-3 py-2 text-stone-600">{s.countryCodes ?? "—"}</td>
+                              <td className="px-3 py-2 text-stone-600">{s.category ?? "—"}</td>
+                              <td className="max-w-[140px] truncate px-3 py-2 text-stone-600" title={s.trackingUrl ?? ""}>
+                                {s.trackingUrl ? <a href={s.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:underline">{String(s.trackingUrl).slice(0, 24)}…</a> : "—"}
+                              </td>
+                              <td className="px-3 py-2 text-stone-600">
+                                Total: 1, Active: {s.status === "disable" ? 0 : 1}, Inactive: {s.status === "disable" ? 1 : 0}
+                              </td>
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingStoreId(s.id);
+                                    setStoreForm({
+                                      name: s.name,
+                                      subStoreName: s.subStoreName ?? "",
+                                      slug: s.slug ?? "",
+                                      slugAuto: !s.slug,
+                                      logoMethod: s.logoMethod ?? "url",
+                                      logoUrl: s.logoUrl ?? "",
+                                      logoAltText: s.logoAltText ?? "",
+                                      description: s.description ?? "",
+                                      networkId: s.networkId ?? "",
+                                      merchantId: s.merchantId ?? "",
+                                      trackingUrl: s.trackingUrl ?? "",
+                                      countryCodes: s.countryCodes ?? "",
+                                      websiteUrl: s.websiteUrl ?? "",
+                                      category: s.category ?? "",
+                                      whyTrustUs: s.whyTrustUs ?? "",
+                                      moreInfo: s.moreInfo ?? "",
+                                      seoTitle: s.seoTitle ?? "",
+                                      seoMetaDesc: s.seoMetaDesc ?? "",
+                                      trending: s.trending ?? false,
+                                    });
+                                    setShowStoresCreateForm(true);
+                                  }}
+                                  className="rounded border border-sky-600 bg-sky-600 px-2 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!confirm("Delete this store?")) return;
+                                    try {
+                                      const res = await fetch(`/api/stores?id=${encodeURIComponent(s.id)}`, { method: "DELETE" });
+                                      if (!res.ok) throw new Error("Failed");
+                                      await fetchStores();
+                                    } catch {
+                                      setMessage({ type: "error", text: "Failed to delete store." });
+                                    }
+                                  }}
+                                  className="ml-1 rounded border border-red-600 bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                  {storeTotal > 0 && (
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 pt-4">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm text-stone-600">
+                          Items per page
+                          <select
+                            value={storePerPage}
+                            onChange={(e) => { setStorePerPage(Number(e.target.value)); setStorePage(1); }}
+                            className="rounded border border-stone-300 px-2 py-1 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                          </select>
+                        </label>
+                        <span className="text-sm text-stone-500">
+                          Showing {(storePage - 1) * storePerPage + 1}-{Math.min(storePage * storePerPage, storeTotal)} of {storeTotal}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          disabled={storePage <= 1}
+                          onClick={() => setStorePage((p) => p - 1)}
+                          className="rounded border border-stone-300 px-3 py-1 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          type="button"
+                          disabled={storePage * storePerPage >= storeTotal}
+                          onClick={() => setStorePage((p) => p + 1)}
+                          className="rounded border border-stone-300 px-3 py-1 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {showStoresCreateForm && (
+                <>
+              <h2 className="mb-4 font-serif text-lg font-semibold text-stone-900">{editingStoreId ? "Edit Store" : "Create New Store"}</h2>
+
+              {message && section === "stores" && (
+                <div
+                  className={`mb-4 rounded border px-4 py-3 text-sm ${
+                    message.type === "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-red-200 bg-red-50 text-red-800"
+                  }`}
+                >
+                  {message.text}
+                </div>
+              )}
+
+              <form onSubmit={handleStoreSubmit} className="space-y-6">
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Left: Store Details & Information */}
+                  <div className="space-y-4 rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
+                    <h3 className="border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
+                      Store Details &amp; Information
+                    </h3>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Store Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={storeForm.name}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Store Name (e.g., Nike)"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Sub Store Name (Displayed on store page)</label>
+                      <input
+                        type="text"
+                        value={storeForm.subStoreName}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, subStoreName: e.target.value }))}
+                        placeholder="e.g., Nike Official Store"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">This name will be displayed on the store page when visiting the store.</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Slug (URL-friendly name)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={storeForm.slugAuto ? (storeForm.name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")) : storeForm.slug}
+                          onChange={(e) => setStoreForm((f) => ({ ...f, slug: e.target.value, slugAuto: false }))}
+                          placeholder="auto-generated"
+                          disabled={storeForm.slugAuto}
+                          className="flex-1 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600 disabled:bg-stone-100"
+                        />
+                        <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-stone-600">
+                          <input
+                            type="checkbox"
+                            checked={storeForm.slugAuto}
+                            onChange={(e) => setStoreForm((f) => ({ ...f, slugAuto: e.target.checked }))}
+                            className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          Auto-generate from name
+                        </label>
+                      </div>
+                      <p className="mt-1 text-xs text-stone-500">URL will be: /stores/slug</p>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-stone-700">Logo Upload Method</label>
+                      <div className="flex gap-4">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="radio"
+                            name="logoMethod"
+                            checked={storeForm.logoMethod === "url"}
+                            onChange={() => setStoreForm((f) => ({ ...f, logoMethod: "url" }))}
+                            className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <span className="text-sm text-stone-700">URL / Extract from Website</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="radio"
+                            name="logoMethod"
+                            checked={storeForm.logoMethod === "upload"}
+                            onChange={() => setStoreForm((f) => ({ ...f, logoMethod: "upload" }))}
+                            className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <span className="text-sm text-stone-700">Upload File (Max 1 MB)</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={storeForm.logoUrl}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                        placeholder="Cloudinary URL, direct image URL, or website URL"
+                        className="flex-1 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <button type="button" className="shrink-0 rounded border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                        Extract Logo
+                      </button>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Logo Alt Text (Optional)</label>
+                      <input
+                        type="text"
+                        value={storeForm.logoAltText}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, logoAltText: e.target.value }))}
+                        placeholder="Store logo"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">Alt text for the store logo (for accessibility and SEO). If left blank, store name will be used.</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Description (Optional)</label>
+                      <textarea
+                        value={storeForm.description}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, description: e.target.value }))}
+                        placeholder="Store Description"
+                        rows={3}
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right: Technical & Affiliate Information */}
+                  <div className="space-y-4 rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
+                    <h3 className="border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
+                      Technical &amp; Affiliate Information
+                    </h3>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Network ID (Region)</label>
+                      <input
+                        type="text"
+                        value={storeForm.networkId}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, networkId: e.target.value }))}
+                        placeholder="Enter numeric Network ID (e.g., 1, 2, 100)"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500"><button type="button" className="text-sky-600 hover:underline">Manage regions</button></p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Merchant ID</label>
+                      <input
+                        type="text"
+                        value={storeForm.merchantId}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, merchantId: e.target.value }))}
+                        placeholder="Enter Merchant ID"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">Enter the Merchant ID for this store (e.g., from affiliate network).</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Tracking URL</label>
+                      <input
+                        type="url"
+                        value={storeForm.trackingUrl}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, trackingUrl: e.target.value }))}
+                        placeholder="https://example.com/tracking-url"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">Tracking/affiliate URL for this store. Used for redirecting users to the store.</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Country Codes</label>
+                      <input
+                        type="text"
+                        value={storeForm.countryCodes}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, countryCodes: e.target.value }))}
+                        placeholder="US, GB, DE, FR (comma-separated)"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">Enter country codes for this store (e.g., US, GB). Use comma to separate.</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Store Website URL (Display)</label>
+                      <input
+                        type="url"
+                        value={storeForm.websiteUrl}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, websiteUrl: e.target.value }))}
+                        placeholder="https://example.com"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">Actual website URL of the store. You can edit it or use Auto-Fetch to guess from store name.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full width: Category, Why Trust Us, More Info, SEO, Trending */}
+                <div className="rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
+                    Category &amp; Content
+                  </h3>
+                  <div className="mb-4">
+                    <label className="mb-1 block text-sm font-medium text-stone-700">Category</label>
+                    <select
+                      value={storeForm.category}
+                      onChange={(e) => setStoreForm((f) => ({ ...f, category: e.target.value }))}
+                      className="w-full max-w-xs rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    >
+                      <option value="">No Category</option>
+                    </select>
+                    <p className="mt-1 text-xs text-stone-500">Assign this store to a category.</p>
+                  </div>
+                  <div className="mb-4">
+                    <label className="mb-1 block text-sm font-medium text-stone-700">Why Trust Us Section (Optional)</label>
+                    <textarea
+                      value={storeForm.whyTrustUs}
+                      onChange={(e) => setStoreForm((f) => ({ ...f, whyTrustUs: e.target.value }))}
+                      placeholder="Why should customers trust this store? Enter custom content here..."
+                      rows={2}
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    />
+                    <p className="mt-1 text-xs text-stone-500">This will appear in the sidebar &quot;Why Trust Us?&quot; section. Leave blank to use default content.</p>
+                  </div>
+                  <div className="mb-4">
+                    <label className="mb-1 block text-sm font-medium text-stone-700">More Information Section (Optional)</label>
+                    <textarea
+                      value={storeForm.moreInfo}
+                      onChange={(e) => setStoreForm((f) => ({ ...f, moreInfo: e.target.value }))}
+                      placeholder="Enter detailed information about the store, coupons, how to use them, etc. You can use HTML tags for formatting."
+                      rows={3}
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    />
+                    <p className="mt-1 text-xs text-stone-500">Supports HTML formatting. Leave blank to use default content.</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 rounded-lg border border-stone-300 bg-white p-5 shadow-sm lg:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-stone-700">SEO Page Title (Optional)</label>
+                    <input
+                      type="text"
+                      value={storeForm.seoTitle}
+                      onChange={(e) => setStoreForm((f) => ({ ...f, seoTitle: e.target.value }))}
+                      placeholder="{store_name} Coupons & Deals {month_year} - Save"
+                      maxLength={100}
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    />
+                    <p className="mt-1 text-xs text-stone-500">Shown in browser tab. Max 100 characters.</p>
+                    <p className="mt-2 text-xs text-stone-600"><strong>Placeholders:</strong> {"{store_name}"}, {"{month_year}"}, {"{active_coupons}"}, {"{highest_offer}"}. Leave blank to use default template.</p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-stone-700">SEO Meta Description (Optional)</label>
+                    <textarea
+                      value={storeForm.seoMetaDesc}
+                      onChange={(e) => setStoreForm((f) => ({ ...f, seoMetaDesc: e.target.value }))}
+                      placeholder="Get the latest Nike coupons & save up to 70%!"
+                      maxLength={160}
+                      rows={2}
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    />
+                    <p className="mt-1 text-xs text-stone-500">Shown in search results. Max 160 characters.</p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={storeForm.trending}
+                      onChange={(e) => setStoreForm((f) => ({ ...f, trending: e.target.checked }))}
+                      className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="text-sm font-medium text-stone-700">Mark as Trending</span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded border-2 border-sky-600 bg-sky-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+                >
+                  {submitting ? (editingStoreId ? "Updating…" : "Creating Store…") : (editingStoreId ? "Update Store" : "Create Store")}
+                </button>
+              </form>
+                </>
+              )}
+
+              {/* Upload Stores Modal */}
+              {showUploadStoresModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4" onClick={() => !uploadStoresSubmitting && setShowUploadStoresModal(false)}>
+                  <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-stone-300 bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                    <h3 className="mb-4 font-serif text-xl font-bold text-stone-900">Upload Stores (CSV)</h3>
+                    <p className="mb-4 text-sm text-stone-600">Upload a CSV. Use headers: <strong>name</strong>, <strong>description</strong>, <strong>logoUrl</strong>, <strong>slug</strong>, <strong>merchantId</strong>, <strong>networkId</strong>, <strong>trackingUrl</strong>, <strong>countryCodes</strong>, <strong>websiteUrl</strong>, <strong>category</strong> (or &quot;Store Name&quot; for name). First row = headers.</p>
+                    <div className="mb-4">
+                      <label className="mb-2 block text-sm font-medium text-stone-700">Choose CSV file</label>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 file:mr-2 file:rounded file:border-0 file:bg-amber-100 file:px-3 file:py-1 file:text-amber-800"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setUploadStoresFile(f);
+                          const text = await f.text();
+                          const lines = text.split(/\r?\n/).filter(Boolean);
+                          const rawHeaders = parseCSVLine(lines[0]).map((h) => h.replace(/^"|"$/g, "").trim());
+                          const norm = (k: string) => k.toLowerCase().replace(/\s+/g, "");
+                          const headerMap: Record<string, string> = { name: "name", storename: "name", description: "description", logo: "logoUrl", logourl: "logoUrl", logo_url: "logoUrl", slug: "slug", merchantid: "merchantId", networkid: "networkId", trackingurl: "trackingUrl", tracking_url: "trackingUrl", countrycodes: "countryCodes", websiteurl: "websiteUrl", website_url: "websiteUrl", category: "category" };
+                          const headers = rawHeaders.map((h) => headerMap[norm(h)] ?? norm(h));
+                          const start = 1;
+                          const preview: Record<string, string>[] = [];
+                          for (let i = start; i < Math.min(lines.length, start + 6); i++) {
+                            const vals = parseCSVLine(lines[i]);
+                            const row: Record<string, string> = {};
+                            headers.forEach((h, j) => { if (h) row[h] = (vals[j] || "").trim(); });
+                            preview.push(row);
+                          }
+                          setUploadStoresPreview(preview);
+                        }}
+                      />
+                    </div>
+                    {uploadStoresPreview && uploadStoresPreview.length > 0 && (
+                      <div className="mb-4 overflow-x-auto rounded border border-stone-200 bg-stone-50 p-2 text-xs">
+                        <p className="mb-2 font-medium text-stone-700">Preview (first rows)</p>
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="border-b border-stone-300">
+                              {Object.keys(uploadStoresPreview[0]).map((k) => <th key={k} className="px-2 py-1 text-left font-medium text-stone-600">{k}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {uploadStoresPreview.map((row, i) => (
+                              <tr key={i} className="border-b border-stone-100">
+                                {Object.values(row).map((v, j) => <td key={j} className="max-w-[120px] truncate px-2 py-1 text-stone-700" title={String(v)}>{String(v)}</td>)}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => { setShowUploadStoresModal(false); setUploadStoresFile(null); setUploadStoresPreview(null); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">Cancel</button>
+                      <button
+                        type="button"
+                        disabled={!uploadStoresFile || uploadStoresSubmitting}
+                        className="rounded border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                        onClick={async () => {
+                          if (!uploadStoresFile) return;
+                          setUploadStoresSubmitting(true);
+                          setMessage(null);
+                          try {
+                            const text = await uploadStoresFile.text();
+                            const lines = text.split(/\r?\n/).filter(Boolean);
+                            const rawHeaders = parseCSVLine(lines[0]).map((h) => h.replace(/^"|"$/g, "").trim());
+                            const norm = (k: string) => k.toLowerCase().replace(/\s+/g, "");
+                            const headerMap: Record<string, string> = { name: "name", storename: "name", description: "description", logo: "logoUrl", logourl: "logoUrl", logo_url: "logoUrl", slug: "slug", merchantid: "merchantId", networkid: "networkId", trackingurl: "trackingUrl", tracking_url: "trackingUrl", countrycodes: "countryCodes", websiteurl: "websiteUrl", website_url: "websiteUrl", category: "category" };
+                            const headers = rawHeaders.map((h) => headerMap[norm(h)] ?? norm(h));
+                            const start = 1;
+                            const stores: Record<string, string>[] = [];
+                            for (let i = start; i < lines.length; i++) {
+                              const vals = parseCSVLine(lines[i]);
+                              const row: Record<string, string> = {};
+                              headers.forEach((h, j) => { if (h) row[h] = (vals[j] || "").trim(); });
+                              if (row.name) stores.push(row);
+                            }
+                            const res = await fetch("/api/stores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stores }) });
+                            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Import failed"); }
+                            const data = await res.json();
+                            setMessage({ type: "success", text: `Imported ${data.imported ?? stores.length} store(s).` });
+                            setShowUploadStoresModal(false);
+                            setUploadStoresFile(null);
+                            setUploadStoresPreview(null);
+                            await fetchStores();
+                          } catch (e) {
+                            setMessage({ type: "error", text: e instanceof Error ? e.message : "Import failed." });
+                          } finally {
+                            setUploadStoresSubmitting(false);
+                          }
+                        }}
+                      >
+                        {uploadStoresSubmitting ? "Importing…" : "Import Stores"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Logos Modal */}
+              {showUploadLogosModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4" onClick={() => !uploadLogoSubmitting && setShowUploadLogosModal(false)}>
+                  <div className="w-full max-w-md rounded-xl border border-stone-300 bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                    <h3 className="mb-4 font-serif text-xl font-bold text-stone-900">Upload Logos</h3>
+                    <p className="mb-4 text-sm text-stone-600">Set logo for a store by selecting the store and entering a logo URL (or upload later via Create/Edit store).</p>
+                    <div className="mb-4">
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Store</label>
+                      <select
+                        value={uploadLogoStoreId}
+                        onChange={(e) => setUploadLogoStoreId(e.target.value)}
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      >
+                        <option value="">Select store…</option>
+                        {stores.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="mb-4">
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Logo URL</label>
+                      <input
+                        type="url"
+                        value={uploadLogoUrl}
+                        onChange={(e) => setUploadLogoUrl(e.target.value)}
+                        placeholder="https://example.com/logo.png"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" onClick={() => { setShowUploadLogosModal(false); setUploadLogoStoreId(""); setUploadLogoUrl(""); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">Cancel</button>
+                      <button
+                        type="button"
+                        disabled={!uploadLogoStoreId || !uploadLogoUrl.trim() || uploadLogoSubmitting}
+                        className="rounded border border-violet-600 bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                        onClick={async () => {
+                          setUploadLogoSubmitting(true);
+                          setMessage(null);
+                          try {
+                            const res = await fetch("/api/stores", {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ id: uploadLogoStoreId, logoUrl: uploadLogoUrl.trim() }),
+                            });
+                            if (!res.ok) throw new Error("Update failed");
+                            setMessage({ type: "success", text: "Logo URL updated." });
+                            setShowUploadLogosModal(false);
+                            setUploadLogoStoreId("");
+                            setUploadLogoUrl("");
+                            await fetchStores();
+                          } catch {
+                            setMessage({ type: "error", text: "Failed to update logo." });
+                          } finally {
+                            setUploadLogoSubmitting(false);
+                          }
+                        }}
+                      >
+                        {uploadLogoSubmitting ? "Updating…" : "Update Logo"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Analytics & Click Tracking - placeholders */}
+          {section === "analytics" && (
+            <>
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                  </span>
+                  <h1 className="font-serif text-2xl font-bold text-slate-900">Analytics Dashboard</h1>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fetchAnalytics()}
+                    disabled={analyticsLoading}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <svg className={`h-4 w-4 ${analyticsLoading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    {analyticsLoading ? "Loading…" : "Refresh"}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-600"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-600"
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                    Check Clicks
+                  </button>
+                </div>
+              </div>
+
+              {/* Coupon Click Tracking hero card */}
+              {analyticsLoading ? (
+                <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">Loading analytics…</div>
+              ) : (
+              <div className="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-violet-700">
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                      <h2 className="text-lg font-semibold">Coupon Click Tracking</h2>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">Track every coupon click with location, device &amp; more</p>
+                    <div className="mt-4 flex flex-wrap gap-6">
+                      <div>
+                        <p className="text-2xl font-bold text-slate-900">{analytics?.totalClicks ?? 0}</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Clicks</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-slate-900">{analytics?.clicksToday ?? 0}</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Today</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-slate-900">{analytics?.clicksThisWeek ?? 0}</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">This Week</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-slate-900">—</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Countries</p>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSection("tracking")}
+                    className="shrink-0 rounded-xl border-2 border-red-500/80 bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-600"
+                  >
+                    View Detailed Click Analytics →
+                  </button>
+                </div>
+              </div>
+              )}
+
+              {/* 4 KPI cards */}
+              <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: "Avg Usage Rate", value: `${analytics?.avgUsageRate ?? "0.0"}%`, accent: "text-sky-600" },
+                  { label: "Percentage Coupons", value: String(analytics?.totalCoupons ?? stores.length), accent: "text-violet-600" },
+                  { label: "Expiring Soon (7 days)", value: "—", accent: "text-amber-600" },
+                  { label: "Total Coupons", value: String(analytics?.totalCoupons ?? stores.length), accent: "text-slate-800" },
+                ].map((kpi) => (
+                  <div key={kpi.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{kpi.label}</p>
+                    <p className={`mt-1 text-xl font-bold ${kpi.accent}`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid: Clicks by Device, Codes vs Deals, Top Countries, Top Stores, Top Coupons, Type Distribution */}
+              <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+                {/* Clicks by Device */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    </span>
+                    Clicks by Device
+                  </h3>
+                  <p className="text-xs text-slate-500">Device breakdown when tracked.</p>
+                  <div className="mt-2 space-y-3">
+                    <div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Total tracked</span>
+                        <span className="font-medium text-slate-900">{analytics?.totalClicks ?? 0}</span>
+                      </div>
+                      <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full max-w-full rounded-full bg-indigo-500" style={{ width: analytics?.totalClicks ? "100%" : "0%" }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Codes vs Deals */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                    </span>
+                    Codes vs Deals
+                  </h3>
+                  <div className="flex items-center justify-around gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
+                        {analytics?.codesCount ?? stores.filter((s) => s.couponType === "code").length}
+                      </div>
+                      <span className="mt-2 text-xs font-medium text-slate-600">Codes</span>
+                    </div>
+                    <span className="text-sm font-bold text-slate-400">VS</span>
+                    <div className="flex flex-col items-center">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-lg font-bold text-emerald-700">
+                        {analytics?.dealsCount ?? (stores.filter((s) => s.couponType !== "code").length || stores.length)}
+                      </div>
+                      <span className="mt-2 text-xs font-medium text-slate-600">Deals</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Countries */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </span>
+                    Top Countries
+                  </h3>
+                  <p className="text-xs text-slate-500">Country data when tracked.</p>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    {([] as { country: string; clicks: number }[]).length === 0 ? (
+                      <li className="rounded-lg bg-slate-50/80 px-3 py-4 text-center text-slate-500">No country data yet</li>
+                    ) : (
+                      ([] as { country: string; clicks: number }[]).map((row, i) => (
+                        <li key={row.country} className="flex items-center justify-between rounded-lg bg-slate-50/80 px-3 py-2">
+                          <span className="font-medium text-slate-500">#{i + 1}</span>
+                          <span className="flex-1 truncate px-2 text-slate-800">{row.country}</span>
+                          <span className="font-semibold text-slate-900">{row.clicks}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+
+                {/* Top Clicked Stores */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                    </span>
+                    Top Clicked Stores
+                  </h3>
+                  <ul className="space-y-2 text-sm">
+                    {(analytics?.byStore ?? []).slice(0, 8).length === 0 ? (
+                      <li className="rounded-lg bg-slate-50/80 px-3 py-4 text-center text-slate-500">Clicks will show when users click &quot;Read More&quot; on coupons</li>
+                    ) : (
+                      (analytics?.byStore ?? []).slice(0, 8).map((row, i) => (
+                        <li key={row.storeId} className="flex items-center justify-between rounded-lg bg-slate-50/80 px-3 py-2">
+                          <span className="font-medium text-slate-500">#{i + 1}</span>
+                          <span className="flex-1 truncate px-2 text-slate-800">{row.storeName}</span>
+                          <span className="font-semibold text-slate-900">{row.count} clicks</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+
+                {/* Top 5 Most Used Coupons */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <span className="rounded-lg bg-amber-100 p-1.5 text-amber-600">
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+                    </span>
+                    Top 5 Most Used Coupons
+                  </h3>
+                  <ul className="space-y-2 text-sm">
+                    {(analytics?.topCoupons ?? []).length > 0
+                      ? (analytics?.topCoupons ?? []).map((row, i) => (
+                          <li key={row.storeId} className="flex items-center justify-between rounded-lg bg-slate-50/80 px-3 py-2">
+                            <span className="font-medium text-slate-500">{i + 1}</span>
+                            <span className="flex-1 truncate px-2 font-mono text-slate-800">{row.code}</span>
+                            <span className="text-slate-600">{row.uses} uses, {row.pct}</span>
+                          </li>
+                        ))
+                      : stores.length > 0
+                        ? stores.slice(0, 5).map((s, i) => (
+                            <li key={s.id} className="flex items-center justify-between rounded-lg bg-slate-50/80 px-3 py-2">
+                              <span className="font-medium text-slate-500">{i + 1}</span>
+                              <span className="flex-1 truncate px-2 font-mono text-slate-800">{s.couponCode || s.name.slice(0, 12).toUpperCase()}</span>
+                              <span className="text-slate-600">0 uses, 0.0%</span>
+                            </li>
+                          ))
+                        : <li className="rounded-lg bg-slate-50/80 px-3 py-4 text-center text-slate-500">No coupons yet</li>
+                    }
+                  </ul>
+                </div>
+
+                {/* Coupon Type Distribution - real data only */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <span className="rounded-lg bg-slate-100 p-1.5 text-slate-600">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /></svg>
+                    </span>
+                    Coupon Type Distribution
+                  </h3>
+                  <div className="space-y-3">
+                    {(() => {
+                      const total = analytics?.totalCoupons ?? stores.length;
+                      const pctPercent = total > 0 ? "100.0" : "0.0";
+                      const barWidth = total > 0 ? "100%" : "0%";
+                      return (
+                        <>
+                          <div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-600">Percentage Coupons</span>
+                              <span className="font-medium text-slate-900">{total} ({pctPercent}%)</span>
+                            </div>
+                            <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: barWidth }} />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-600">Fixed Amount Coupons</span>
+                              <span className="font-medium text-slate-900">0 (0.0%)</span>
+                            </div>
+                            <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full w-0 rounded-full bg-slate-300" />
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {section === "tracking" && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h1 className="font-serif text-2xl font-bold text-slate-900">Click Tracking</h1>
+                <button
+                  type="button"
+                  onClick={() => setSection("analytics")}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  ← Back to Analytics
+                </button>
+              </div>
+              <p className="text-sm text-slate-600">
+                Detailed click analytics (by location, device, time) can be wired to your tracking backend here.
+              </p>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
