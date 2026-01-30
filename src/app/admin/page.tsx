@@ -1192,7 +1192,8 @@ export default function AdminPage() {
                               headers.forEach((h, j) => { if (h) row[h] = (vals[j] || "").trim(); });
                               const desc = (row.description || row.desc || row.details || row.name || "").trim();
                               const typeVal = (row.couponType || "").toLowerCase();
-                              if (row.name) stores.push({ ...row, description: desc || row.name, couponType: typeVal === "code" ? "code" : typeVal === "deal" ? "deal" : undefined });
+                              const couponType = typeVal === "code" ? "code" : typeVal === "deal" ? "deal" : "";
+                              if (row.name) stores.push({ ...row, description: desc || row.name, ...(couponType && { couponType }) });
                             }
                             const res = await fetch("/api/stores", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stores }) });
                             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error ?? "Import failed"); }
