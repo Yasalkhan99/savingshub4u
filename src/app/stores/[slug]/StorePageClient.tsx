@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Store } from "@/types/store";
 import { slugify } from "@/lib/slugify";
+import CouponRevealModal from "@/components/CouponRevealModal";
 
 type Props = {
   storeInfo: Store;
@@ -34,6 +35,14 @@ export default function StorePageClient({
 }: Props) {
   const [tab, setTab] = useState<"coupons" | "info" | "faqs">("coupons");
   const [filter, setFilter] = useState<"all" | "code" | "deal">("all");
+  const [revealingCoupon, setRevealingCoupon] = useState<{
+    code: string;
+    title: string;
+    storeName: string;
+    storeLogo: string;
+    redirect: string;
+    storeId: string;
+  } | null>(null);
 
   const filtered =
     filter === "all"
@@ -46,7 +55,15 @@ export default function StorePageClient({
   const moreInfo = storeInfo.moreInfo?.trim();
 
   return (
-    <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
+    <>
+      {revealingCoupon && (
+        <CouponRevealModal
+          {...revealingCoupon}
+          onClose={() => setRevealingCoupon(null)}
+          blurBackdrop
+        />
+      )}
+      <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
       {/* Sidebar */}
       <aside className="order-2 shrink-0 lg:order-1 lg:w-72">
         <div className="sticky top-4 space-y-6">
@@ -172,26 +189,61 @@ export default function StorePageClient({
                   const clickUrl = href.startsWith("http")
                     ? `/api/click?storeId=${encodeURIComponent(c.id)}&redirect=${encodeURIComponent(href)}`
                     : href;
+                  const dealTitle = c.couponTitle || (isCode ? `Use code ${c.couponCode || ""}` : "Deal");
+                  const partialCode = isCode && c.couponCode
+                    ? `...${String(c.couponCode).slice(-2)}`
+                    : "...";
+                  const revealParams = new URLSearchParams({
+                    code: c.couponCode || "",
+                    title: dealTitle,
+                    storeName: storeInfo.name,
+                    storeLogo: storeInfo.logoUrl || "",
+                    redirect: href,
+                    storeId: c.id,
+                  });
+                  const revealUrl = `/coupon/reveal?${revealParams.toString()}`;
+                  const handleCouponClick = () => {
+                    setRevealingCoupon({
+                      code: c.couponCode || "",
+                      title: dealTitle,
+                      storeName: storeInfo.name,
+                      storeLogo: storeInfo.logoUrl || "",
+                      redirect: href,
+                      storeId: c.id,
+                    });
+                    window.open(revealUrl, "_blank", "noopener,noreferrer");
+                    window.open(clickUrl, "_blank", "noopener,noreferrer");
+                  };
+
                   return (
                     <li
                       key={c.id}
-                      className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                      className="group/card flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="min-w-0 flex-1">
                         <h3 className="font-semibold text-zinc-900">
-                          {c.couponTitle || (isCode ? `Use code ${c.couponCode || ""}` : "Deal")}
+                          {dealTitle}
                         </h3>
                         <p className="mt-1 text-sm text-zinc-600">
-                          {isCode ? "Verified & Hand-Tested Code" : "Verified & Hand-Tested Deal"}
+                          {isCode ? `${storeInfo.name} Verified & Hand-Tested Code` : "Verified & Hand-Tested Deal"}
                         </p>
-                        <p className="mt-1 text-xs text-zinc-500">Expires: {c.expiry || "Dec 31, 2026"}</p>
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+                          <span className="inline-block h-4 w-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                            <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                          </span>
+                          Verified {c.expiry ? new Date(c.expiry).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Dec 31, 2026"}
+                        </p>
                       </div>
-                      <a
-                        href={clickUrl}
-                        className="shrink-0 rounded-xl bg-zinc-900 px-5 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-zinc-800"
+                      <button
+                        type="button"
+                        onClick={handleCouponClick}
+                        className="get-code-btn group/btn flex shrink-0 items-center justify-center gap-0 overflow-hidden rounded-r-xl rounded-l-lg border-2 border-red-500 bg-red-500 px-4 py-2.5 text-sm font-bold text-white transition-all hover:border-zinc-900 hover:bg-zinc-900 hover:text-red-400"
                       >
-                        {isCode ? "Get Code" : "Get Deal"}
-                      </a>
+                        <span className="py-0.5">{isCode ? "Get Code" : "Get Deal"}</span>
+                        <span className="get-code-partial ml-0 w-0 overflow-hidden border-l-0 border-red-400/0 py-0.5 pl-0 text-red-400 transition-all duration-200 group-hover/btn:ml-2 group-hover/btn:w-auto group-hover/btn:border-l-2 group-hover/btn:border-red-400 group-hover/btn:pl-2">
+                          {isCode ? partialCode : ""}
+                        </span>
+                      </button>
                     </li>
                   );
                 })}
@@ -266,5 +318,6 @@ export default function StorePageClient({
         </section>
       </div>
     </div>
+    </>
   );
 }

@@ -44,6 +44,9 @@ function AdminLoginForm() {
             SavingsHub4u
           </Link>
           <p className="mt-2 text-sm text-zinc-500">Admin access</p>
+          <p className="mt-1 text-xs text-zinc-400 max-w-[260px] mx-auto">
+            Sign in with your admin password to manage coupons and stores.
+          </p>
         </div>
 
         <form
