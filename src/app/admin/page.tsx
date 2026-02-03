@@ -124,7 +124,16 @@ export default function AdminPage() {
   const [blogLoading, setBlogLoading] = useState(false);
   const [showBlogForm, setShowBlogForm] = useState(false);
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null);
-  const [blogForm, setBlogForm] = useState({
+  const [blogForm, setBlogForm] = useState<{
+    title: string;
+    slug: string;
+    category: (typeof blogCategories)[number];
+    excerpt: string;
+    image: string;
+    featured: boolean;
+    content: string;
+    publishedDate: string;
+  }>({
     title: "",
     slug: "",
     category: blogCategories[0],
@@ -287,8 +296,8 @@ export default function AdminPage() {
   const insertContentHtml = (openTag: string, closeTag: string) => {
     const ta = contentTextareaRef.current;
     if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
     const val = ta.value;
     const before = val.slice(0, start);
     const sel = val.slice(start, end);
@@ -312,8 +321,8 @@ export default function AdminPage() {
   const insertContentHtmlForField = (field: "title" | "excerpt", openTag: string, closeTag: string) => {
     const el = field === "title" ? titleInputRef.current : excerptTextareaRef.current;
     if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
     const val = el.value;
     const before = val.slice(0, start);
     const sel = val.slice(start, end);
@@ -341,8 +350,8 @@ export default function AdminPage() {
     if (!/^https?:\/\//i.test(fullUrl)) fullUrl = "https://" + fullUrl;
     const el = field === "title" ? titleInputRef.current : excerptTextareaRef.current;
     if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
     const val = el.value;
     const rawSel = val.slice(start, end) || "link text";
     const before = val.slice(0, start);
@@ -363,8 +372,8 @@ export default function AdminPage() {
     }
     const ta = contentTextareaRef.current;
     if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
     const val = ta.value;
     const rawSel = val.slice(start, end) || "link text";
     const before = val.slice(0, start);
@@ -1693,7 +1702,12 @@ export default function AdminPage() {
 
               {showStoresCreateForm && (
                 <>
-              <h2 className="mb-4 font-serif text-lg font-semibold text-stone-900">{editingStoreId ? "Edit Store" : "Create New Store"}</h2>
+              <div className="mb-4">
+                <h2 className="font-serif text-lg font-semibold text-stone-900">{editingStoreId ? "Edit Store" : "Create New Store"}</h2>
+                {storeForm.merchantId.trim() && (
+                  <p className="mt-1 text-sm font-medium text-stone-600">Merchant ID: {storeForm.merchantId}</p>
+                )}
+              </div>
 
               {message && section === "stores" && (
                 <div
@@ -1784,18 +1798,48 @@ export default function AdminPage() {
                         </label>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={storeForm.logoUrl}
-                        onChange={(e) => setStoreForm((f) => ({ ...f, logoUrl: e.target.value }))}
-                        placeholder="Cloudinary URL, direct image URL, or website URL"
-                        className="flex-1 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
-                      />
-                      <button type="button" className="shrink-0 rounded border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700">
-                        Extract Logo
-                      </button>
-                    </div>
+                    {storeForm.logoMethod === "url" ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={storeForm.logoUrl}
+                          onChange={(e) => setStoreForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                          placeholder="Cloudinary URL, direct image URL, or website URL"
+                          className="flex-1 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                        />
+                        <button type="button" className="shrink-0 rounded border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700">
+                          Extract Logo
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="block w-full text-sm text-stone-600 file:mr-3 file:rounded file:border-0 file:bg-amber-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white file:hover:bg-amber-700"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 1024 * 1024) {
+                              setMessage({ type: "error", text: "Logo must be 1 MB or smaller." });
+                              e.target.value = "";
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = () => setStoreForm((f) => ({ ...f, logoUrl: String(reader.result) }));
+                            reader.readAsDataURL(file);
+                            e.target.value = "";
+                          }}
+                        />
+                        <p className="mt-1 text-xs text-stone-500">Choose an image (max 1 MB). It will be stored as a data URL.</p>
+                        {storeForm.logoUrl && storeForm.logoUrl.startsWith("data:") && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <img src={storeForm.logoUrl} alt="Logo preview" className="h-12 w-12 rounded border border-stone-200 object-contain" />
+                            <span className="text-xs text-stone-600">Logo selected</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <label className="mb-1 block text-sm font-medium text-stone-700">Logo Alt Text (Optional)</label>
                       <input
@@ -1884,6 +1928,9 @@ export default function AdminPage() {
 
                 {/* Full width: Category, Why Trust Us, More Info, SEO, Trending */}
                 <div className="rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
+                  {storeForm.networkId.trim() && (
+                    <h2 className="mb-3 text-base font-semibold text-stone-700">Network ID: {storeForm.networkId}</h2>
+                  )}
                   <h3 className="mb-4 border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
                     Category &amp; Content
                   </h3>
@@ -2210,7 +2257,7 @@ export default function AdminPage() {
                                   setBlogForm({
                                     title: p.title,
                                     slug: p.slug,
-                                    category: p.category,
+                                    category: (blogCategories as readonly string[]).includes(p.category) ? (p.category as (typeof blogCategories)[number]) : blogCategories[0],
                                     excerpt: p.excerpt ?? "",
                                     image: p.image ?? "",
                                     featured: p.featured ?? false,
@@ -2288,7 +2335,7 @@ export default function AdminPage() {
                           <label className="mb-1 block text-sm font-medium text-stone-700">Category</label>
                           <select
                             value={blogForm.category}
-                            onChange={(e) => setBlogForm((f) => ({ ...f, category: e.target.value }))}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, category: e.target.value as (typeof blogCategories)[number] }))}
                             className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                           >
                             {blogCategories.map((c) => (
