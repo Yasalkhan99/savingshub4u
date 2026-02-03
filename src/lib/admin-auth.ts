@@ -77,7 +77,7 @@ export function getSessionCookieOptions() {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    path: "/admin",
+    path: "/", // must be "/" so cookie is sent to /api/blog (PATCH/POST/DELETE) when admin edits from /admin
     maxAge: 24 * 60 * 60, // 24 hours in seconds
   };
 }

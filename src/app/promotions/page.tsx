@@ -2,7 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 import PromotionsHeader from "@/components/PromotionsHeader";
 import { getStores, slugify } from "@/lib/stores";
-import { featuredPosts } from "@/data/blog";
+import { getBlogData } from "@/lib/blog";
+import { stripHtml } from "@/lib/slugify";
 
 const PROMO_CATEGORIES = [
   { name: "Baby & Kids", icon: "👶", accent: "from-rose-100 to-pink-100" },
@@ -21,6 +22,7 @@ const PROMO_CATEGORIES = [
 
 export default async function PromotionsPage() {
   const stores = await getStores();
+  const { featuredPosts } = await getBlogData();
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
@@ -99,7 +101,7 @@ export default async function PromotionsPage() {
                 <div className="relative aspect-video w-full overflow-hidden bg-zinc-100">
                   <Image
                     src={post.image}
-                    alt={post.title}
+                    alt={stripHtml(post.title)}
                     fill
                     className="object-cover transition group-hover:scale-105"
                     sizes="(max-width: 768px) 100vw, 33vw"
@@ -109,12 +111,8 @@ export default async function PromotionsPage() {
                   <span className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-600">
                     {post.category}
                   </span>
-                  <h3 className="mb-2 line-clamp-2 text-base font-bold text-zinc-900 group-hover:text-blue-600">
-                    {post.title}
-                  </h3>
-                  <p className="mb-3 flex-1 line-clamp-2 text-sm text-zinc-600">
-                    {post.excerpt}
-                  </p>
+                  <h3 className="mb-2 line-clamp-2 text-base font-bold text-zinc-900 group-hover:text-blue-600 [&_a]:text-red-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: post.title }} />
+                  <div className="blog-content mb-3 flex-1 line-clamp-2 text-sm text-zinc-600" dangerouslySetInnerHTML={{ __html: post.excerpt }} />
                   <span className="text-sm font-medium text-blue-600 group-hover:underline">
                     Read More →
                   </span>

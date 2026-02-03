@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { BlogPost } from "@/data/blog";
+import { stripHtml } from "@/lib/slugify";
 
 type ArticleCardProps = {
   post: BlogPost;
@@ -12,7 +13,7 @@ export default function ArticleCard({ post }: ArticleCardProps) {
       <Link href={`/blog/${post.slug}`} className="relative block aspect-[16/10] overflow-hidden">
         <Image
           src={post.image}
-          alt={post.title}
+          alt={stripHtml(post.title)}
           fill
           className="object-cover transition group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -23,11 +24,9 @@ export default function ArticleCard({ post }: ArticleCardProps) {
           {post.category}
         </span>
         <Link href={`/blog/${post.slug}`} className="mb-2 flex-1">
-          <h2 className="text-lg font-bold leading-snug text-zinc-900 line-clamp-2 group-hover:underline">
-            {post.title}
-          </h2>
+          <h2 className="text-lg font-bold leading-snug text-zinc-900 line-clamp-2 group-hover:underline [&_a]:text-red-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: post.title }} />
         </Link>
-        <p className="mb-4 line-clamp-2 text-sm text-zinc-600">{post.excerpt}</p>
+        <div className="blog-content mb-4 line-clamp-2 text-sm text-zinc-600" dangerouslySetInnerHTML={{ __html: post.excerpt }} />
         <Link
           href={`/blog/${post.slug}`}
           className="inline-flex w-fit items-center text-sm font-semibold text-red-600 hover:underline"

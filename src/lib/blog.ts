@@ -1,0 +1,102 @@
+import { readFile, writeFile, mkdir } from "fs/promises";
+import path from "path";
+import { cache } from "react";
+import type { BlogPost } from "@/data/blog";
+import { categories } from "@/data/blog";
+import type { NavDropdownPost } from "@/data/blog";
+
+export type BlogPostWithContent = BlogPost & {
+  content?: string;
+  createdAt?: string;
+  publishedDate?: string;
+};
+
+const getBlogPath = () => path.join(process.cwd(), "data", "blog.json");
+
+export async function readBlogPosts(): Promise<BlogPostWithContent[]> {
+  try {
+    const data = await readFile(getBlogPath(), "utf-8");
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+export async function writeBlogPosts(posts: BlogPostWithContent[]) {
+  const filePath = getBlogPath();
+  const dir = path.dirname(filePath);
+  await mkdir(dir, { recursive: true });
+  await writeFile(filePath, JSON.stringify(posts, null, 2), "utf-8");
+}
+
+export async function getPostBySlug(slug: string): Promise<BlogPostWithContent | null> {
+  const posts = await readBlogPosts();
+  return posts.find((p) => p.slug === slug) ?? null;
+}
+
+export type BlogData = {
+  heroPost: BlogPostWithContent;
+  featuredPosts: BlogPostWithContent[];
+  mostPopularPosts: BlogPostWithContent[];
+  latestPosts: BlogPostWithContent[];
+  trendingPosts: BlogPostWithContent[];
+  footerCategories: { name: string; posts: BlogPostWithContent[] }[];
+  navDropdownPosts: Record<string, NavDropdownPost[]>;
+  allPosts: BlogPostWithContent[];
+};
+
+export const getBlogData = cache(async (): Promise<BlogData> => {
+  const posts = await readBlogPosts();
+  const sorted = [...posts].sort(
+    (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+  );
+  const featured = posts.filter((p) => p.featured);
+  const heroPost = featured[0] ?? sorted[0];
+  const featuredPosts = featured.slice(0, 3);
+  const mostPopularPosts = sorted.slice(0, 10);
+  const latestPosts = sorted.slice(0, 6);
+  const trendingPosts = [
+    ...(sorted[0] ? [sorted[0]] : []),
+    ...(sorted[1] ? [sorted[1]] : []),
+    ...(sorted[2] ? [sorted[2]] : []),
+    ...(sorted[3] ? [sorted[3]] : []),
+    ...(sorted[4] ? [sorted[4]] : []),
+    ...(sorted[5] ? [sorted[5]] : []),
+  ];
+  const withDate = (p: BlogPostWithContent, date: string): NavDropdownPost => ({
+    ...p,
+    date: p.publishedDate ?? date,
+  });
+  const navDropdownPosts: Record<string, NavDropdownPost[]> = {
+    fashion: mostPopularPosts.slice(0, 4).map((p, i) => withDate(p, ["JANUARY 2, 2026", "DECEMBER 6, 2025", "DECEMBER 2, 2025", "NOVEMBER 17, 2025"][i] ?? "")),
+    lifestyle: mostPopularPosts.slice(1, 5).map((p, i) => withDate(p, ["JANUARY 5, 2026", "DECEMBER 2, 2025", "DECEMBER 28, 2025", "DECEMBER 20, 2025"][i] ?? "")),
+    featured: [heroPost, ...mostPopularPosts.slice(0, 3)].map((p, i) => withDate(p, ["JANUARY 2, 2026", "DECEMBER 10, 2025", "JANUARY 1, 2026", "DECEMBER 15, 2025"][i] ?? "")),
+  };
+  const footerCategories = [
+    { name: "FASHION", posts: mostPopularPosts.slice(0, 4) },
+    { name: "HOME & OUTDOOR", posts: mostPopularPosts.slice(1, 5) },
+    { name: "LIFESTYLE", posts: latestPosts.slice(1, 5) },
+    { name: "BEAUTY", posts: mostPopularPosts.filter((p) => p.category.includes("BEAUTY")).slice(0, 4) },
+  ];
+  const fallbackHero: BlogPostWithContent = {
+    id: "",
+    title: "No posts yet",
+    excerpt: "Add posts from Admin → Blog.",
+    category: "NEWS",
+    slug: "",
+    image: "https://picsum.photos/id/1/1200/600",
+    featured: false,
+  };
+  return {
+    heroPost: heroPost ?? fallbackHero,
+    featuredPosts,
+    mostPopularPosts,
+    latestPosts,
+    trendingPosts,
+    footerCategories,
+    navDropdownPosts,
+    allPosts: posts,
+  };
+});
+
+export { categories };

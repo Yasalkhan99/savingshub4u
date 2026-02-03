@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { getBlogData } from "@/lib/blog";
+import { BlogDataProvider } from "@/components/BlogDataProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,17 +26,30 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const blogData = await getBlogData();
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <BlogDataProvider
+          initialData={{
+            heroPost: blogData.heroPost,
+            featuredPosts: blogData.featuredPosts,
+            mostPopularPosts: blogData.mostPopularPosts,
+            latestPosts: blogData.latestPosts,
+            trendingPosts: blogData.trendingPosts,
+            footerCategories: blogData.footerCategories,
+            navDropdownPosts: blogData.navDropdownPosts,
+          }}
+        >
+          {children}
+        </BlogDataProvider>
       </body>
     </html>
   );

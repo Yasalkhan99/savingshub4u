@@ -3,12 +3,10 @@ import Hero from "@/components/Hero";
 import ArticleCard from "@/components/ArticleCard";
 import TrendingSidebar from "@/components/TrendingSidebar";
 import Footer from "@/components/Footer";
-import {
-  mostPopularPosts,
-  latestPosts,
-} from "@/data/blog";
+import { getBlogData } from "@/lib/blog";
 
-export default function Home() {
+export default async function Home() {
+  const { mostPopularPosts, latestPosts } = await getBlogData();
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <main>

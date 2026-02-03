@@ -4,7 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { navDropdownPosts, type NavDropdownPost } from "@/data/blog";
+import { useBlogData } from "@/components/BlogDataProvider";
+import type { NavDropdownPost } from "@/data/blog";
+import { stripHtml } from "@/lib/slugify";
 
 type HeaderProps = {
   transparent?: boolean;
@@ -36,7 +38,7 @@ function DropdownCard({ post }: { post: NavDropdownPost }) {
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-100">
         <Image
           src={post.image}
-          alt={post.title}
+          alt={stripHtml(post.title)}
           fill
           className="object-cover transition group-hover:scale-105"
           sizes="240px"
@@ -46,9 +48,7 @@ function DropdownCard({ post }: { post: NavDropdownPost }) {
         <span className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-red-600">
           {post.category}
         </span>
-        <span className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-zinc-900 group-hover:text-red-600">
-          {post.title}
-        </span>
+        <span className="mb-2 line-clamp-2 text-sm font-bold leading-snug text-zinc-900 group-hover:text-red-600 [&_a]:text-red-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: post.title }} />
         <span className="mt-auto text-xs text-zinc-500">WEBADMIN · {post.date}</span>
       </div>
     </Link>
@@ -56,6 +56,7 @@ function DropdownCard({ post }: { post: NavDropdownPost }) {
 }
 
 export default function Header({ transparent }: HeaderProps = {}) {
+  const { navDropdownPosts } = useBlogData();
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [scrolled, setScrolled] = useState(false);

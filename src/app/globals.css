@@ -37,3 +37,13 @@ body {
 .animate-scroll-left {
   animation: scroll-left 30s linear infinite;
 }
+
+/* Blog post content – links clearly red and clickable */
+.blog-content a {
+  color: #dc2626;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.blog-content a:hover {
+  opacity: 0.9;
+}

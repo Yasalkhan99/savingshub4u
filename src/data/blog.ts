@@ -6,6 +6,10 @@ export type BlogPost = {
   slug: string;
   image: string;
   featured?: boolean;
+  /** Full article HTML – editable in Admin → Blog */
+  content?: string;
+  createdAt?: string;
+  publishedDate?: string;
 };
 
 export const categories = [

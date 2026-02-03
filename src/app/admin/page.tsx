@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import type { Store } from "@/types/store";
+import type { BlogPost } from "@/data/blog";
+import { categories as blogCategories } from "@/data/blog";
+import { stripHtml, slugify } from "@/lib/slugify";
 
-type Section = "dashboard" | "coupons" | "stores" | "analytics" | "tracking";
+type Section = "dashboard" | "coupons" | "stores" | "blog" | "analytics" | "tracking";
 
 const SIDEBAR_LINKS: { id: Section; label: string; icon: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: "◉" },
   { id: "coupons", label: "Coupons", icon: "◇" },
   { id: "stores", label: "Stores", icon: "▣" },
+  { id: "blog", label: "Blog", icon: "✎" },
   { id: "analytics", label: "Analytics", icon: "▤" },
   { id: "tracking", label: "Click Tracking", icon: "◈" },
 ];
@@ -116,6 +120,24 @@ export default function AdminPage() {
   const [uploadCouponsPreview, setUploadCouponsPreview] = useState<Record<string, string>[] | null>(null);
   const [uploadCouponsSubmitting, setUploadCouponsSubmitting] = useState(false);
 
+  const [blogPosts, setBlogPosts] = useState<(BlogPost & { content?: string; createdAt?: string; publishedDate?: string })[]>([]);
+  const [blogLoading, setBlogLoading] = useState(false);
+  const [showBlogForm, setShowBlogForm] = useState(false);
+  const [editingBlogId, setEditingBlogId] = useState<string | null>(null);
+  const [blogForm, setBlogForm] = useState({
+    title: "",
+    slug: "",
+    category: blogCategories[0],
+    excerpt: "",
+    image: "",
+    featured: false,
+    content: "",
+    publishedDate: "",
+  });
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const excerptTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   const [analytics, setAnalytics] = useState<{
     totalClicks: number;
     clicksToday: number;
@@ -171,6 +193,190 @@ export default function AdminPage() {
   useEffect(() => {
     if (section === "analytics") fetchAnalytics();
   }, [section]);
+
+  const fetchBlogs = async () => {
+    setBlogLoading(true);
+    try {
+      const res = await fetch("/api/blog");
+      const data = await res.json();
+      setBlogPosts(Array.isArray(data) ? data : []);
+    } catch {
+      setBlogPosts([]);
+    } finally {
+      setBlogLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (section === "blog") fetchBlogs();
+  }, [section]);
+
+  const handleBlogSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setSubmitting(true);
+    try {
+    const slug =
+      blogForm.slug.trim() !== ""
+        ? blogForm.slug.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
+        : slugify(stripHtml(blogForm.title));
+      if (editingBlogId) {
+        const res = await fetch("/api/blog", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingBlogId,
+            title: blogForm.title.trim(),
+            slug: slug || undefined,
+            category: blogForm.category,
+            excerpt: blogForm.excerpt.trim(),
+            image: blogForm.image.trim(),
+            featured: blogForm.featured,
+            content: blogForm.content.trim(),
+            publishedDate: blogForm.publishedDate.trim() || undefined,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Failed to update post");
+        }
+        setMessage({ type: "success", text: "Blog post updated successfully." });
+        setEditingBlogId(null);
+      } else {
+        const res = await fetch("/api/blog", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: blogForm.title.trim(),
+            slug: slug || undefined,
+            category: blogForm.category,
+            excerpt: blogForm.excerpt.trim(),
+            image: blogForm.image.trim(),
+            featured: blogForm.featured,
+            content: blogForm.content.trim(),
+            publishedDate: blogForm.publishedDate.trim() || undefined,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Failed to create post");
+        }
+        setMessage({ type: "success", text: "Blog post created successfully." });
+      }
+      setBlogForm({
+        title: "",
+        slug: "",
+        category: blogCategories[0],
+        excerpt: "",
+        image: "",
+        featured: false,
+        content: "",
+        publishedDate: "",
+      });
+      setShowBlogForm(false);
+      await fetchBlogs();
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Something went wrong." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const insertContentHtml = (openTag: string, closeTag: string) => {
+    const ta = contentTextareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
+    const before = val.slice(0, start);
+    const sel = val.slice(start, end);
+    const after = val.slice(end);
+    let newVal: string;
+    let newCursor: number;
+    if (sel) {
+      newVal = before + openTag + sel + closeTag + after;
+      newCursor = start + openTag.length + sel.length;
+    } else {
+      newVal = before + openTag + closeTag + after;
+      newCursor = start + openTag.length;
+    }
+    setBlogForm((f) => ({ ...f, content: newVal }));
+    setTimeout(() => {
+      ta.focus();
+      ta.setSelectionRange(newCursor, newCursor);
+    }, 0);
+  };
+
+  const insertContentHtmlForField = (field: "title" | "excerpt", openTag: string, closeTag: string) => {
+    const el = field === "title" ? titleInputRef.current : excerptTextareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const val = el.value;
+    const before = val.slice(0, start);
+    const sel = val.slice(start, end);
+    const after = val.slice(end);
+    let newVal: string;
+    let newCursor: number;
+    if (sel) {
+      newVal = before + openTag + sel + closeTag + after;
+      newCursor = start + openTag.length + sel.length;
+    } else {
+      newVal = before + openTag + closeTag + after;
+      newCursor = start + openTag.length;
+    }
+    setBlogForm((f) => ({ ...f, [field]: newVal }));
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(newCursor, newCursor);
+    }, 0);
+  };
+
+  const insertLinkForField = (field: "title" | "excerpt") => {
+    const url = window.prompt("Link URL (e.g. google.com or https://example.com):");
+    if (url == null || url.trim() === "") return;
+    let fullUrl = url.trim();
+    if (!/^https?:\/\//i.test(fullUrl)) fullUrl = "https://" + fullUrl;
+    const el = field === "title" ? titleInputRef.current : excerptTextareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const val = el.value;
+    const rawSel = val.slice(start, end) || "link text";
+    const before = val.slice(0, start);
+    const after = val.slice(end);
+    const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const escapeText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const newVal = before + `<a href="${escapeAttr(fullUrl)}" target="_blank" rel="noopener noreferrer">${escapeText(rawSel)}</a>` + after;
+    setBlogForm((f) => ({ ...f, [field]: newVal }));
+    setTimeout(() => el.focus(), 0);
+  };
+
+  const insertLink = () => {
+    const url = window.prompt("Link URL (e.g. google.com or https://example.com):");
+    if (url == null || url.trim() === "") return;
+    let fullUrl = url.trim();
+    if (!/^https?:\/\//i.test(fullUrl)) {
+      fullUrl = "https://" + fullUrl;
+    }
+    const ta = contentTextareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
+    const rawSel = val.slice(start, end) || "link text";
+    const before = val.slice(0, start);
+    const after = val.slice(end);
+    const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const escapeText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const safeUrl = escapeAttr(fullUrl);
+    const safeText = escapeText(rawSel);
+    const newVal = before + `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeText}</a>` + after;
+    setBlogForm((f) => ({ ...f, content: newVal }));
+    setTimeout(() => ta.focus(), 0);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -555,6 +761,7 @@ export default function AdminPage() {
                     { label: "Bulk import stores & coupons", sub: "Import Excel", onClick: () => {} },
                     { label: "View & edit all stores", sub: "Manage Stores", onClick: () => setSection("stores") },
                     { label: "View & edit all coupons", sub: "Manage Coupons", onClick: () => setSection("coupons") },
+                    { label: "Edit blog posts (WordPress-style)", sub: "Manage Blog", onClick: () => setSection("blog") },
                     { label: "Track coupon clicks by location", sub: "Click Analytics", onClick: () => setSection("analytics") },
                   ].map((action, i) => (
                     <button
@@ -1928,6 +2135,265 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
+              )}
+            </>
+          )}
+
+          {/* Blog - Manage Blog posts (WordPress-style) */}
+          {section === "blog" && (
+            <>
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h1 className="font-serif text-2xl font-bold text-stone-900">Manage Blog</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  {showBlogForm ? (
+                    <button
+                      type="button"
+                      onClick={() => { setShowBlogForm(false); setEditingBlogId(null); setMessage(null); }}
+                      className="rounded border border-stone-300 bg-stone-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-stone-700"
+                    >
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowBlogForm(true)}
+                      className="rounded border border-stone-300 bg-sky-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-700"
+                    >
+                      Create New Post
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {message && section === "blog" && (
+                <div
+                  className={`mb-4 rounded border px-4 py-3 text-sm ${
+                    message.type === "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-red-200 bg-red-50 text-red-800"
+                  }`}
+                >
+                  {message.text}
+                </div>
+              )}
+
+              {!showBlogForm && (
+                <div className="overflow-x-auto rounded-lg border border-stone-300 bg-white shadow-sm">
+                  {blogLoading ? (
+                    <div className="p-8 text-center text-sm text-stone-500">Loading posts…</div>
+                  ) : blogPosts.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-stone-500">No blog posts yet. Create one above.</div>
+                  ) : (
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-200 bg-stone-50">
+                          <th className="px-3 py-2 text-left font-semibold text-stone-700">Title</th>
+                          <th className="px-3 py-2 text-left font-semibold text-stone-700">Slug</th>
+                          <th className="px-3 py-2 text-left font-semibold text-stone-700">Category</th>
+                          <th className="px-3 py-2 text-left font-semibold text-stone-700">Featured</th>
+                          <th className="px-3 py-2 text-left font-semibold text-stone-700">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {blogPosts.map((p) => (
+                          <tr key={p.id} className="border-b border-stone-100 hover:bg-stone-50/50">
+                            <td className="px-3 py-2 font-medium text-stone-900">{p.title}</td>
+                            <td className="px-3 py-2 text-stone-600">{p.slug}</td>
+                            <td className="px-3 py-2 text-stone-600">{p.category}</td>
+                            <td className="px-3 py-2">{p.featured ? "✓" : "—"}</td>
+                            <td className="px-3 py-2">
+                              <a href={`/blog/${p.slug}`} target="_blank" rel="noopener noreferrer" className="mr-2 text-sky-600 hover:underline">View</a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingBlogId(p.id);
+                                  setBlogForm({
+                                    title: p.title,
+                                    slug: p.slug,
+                                    category: p.category,
+                                    excerpt: p.excerpt ?? "",
+                                    image: p.image ?? "",
+                                    featured: p.featured ?? false,
+                                    content: (p as { content?: string }).content ?? "",
+                                    publishedDate: (p as { publishedDate?: string }).publishedDate ?? "",
+                                  });
+                                  setShowBlogForm(true);
+                                }}
+                                className="rounded border border-sky-600 bg-sky-600 px-2 py-1 text-xs font-medium text-white hover:bg-sky-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!confirm("Delete this post?")) return;
+                                  try {
+                                    const res = await fetch(`/api/blog?id=${encodeURIComponent(p.id)}`, { method: "DELETE", credentials: "include" });
+                                    if (!res.ok) throw new Error("Failed");
+                                    await fetchBlogs();
+                                  } catch {
+                                    setMessage({ type: "error", text: "Failed to delete post." });
+                                  }
+                                }}
+                                className="ml-1 rounded border border-red-600 bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {showBlogForm && (
+                <>
+                  <h2 className="mb-4 font-serif text-lg font-semibold text-stone-900">{editingBlogId ? "Edit Post" : "Create New Post"}</h2>
+                  <form onSubmit={handleBlogSubmit} className="space-y-6">
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      <div className="space-y-4 rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
+                        <h3 className="border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">Post details</h3>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-stone-700">Title *</label>
+                          <div className="mb-1 flex flex-wrap items-center gap-1 rounded border border-stone-200 bg-stone-50 p-1">
+                            <span className="mr-1 text-xs text-stone-500">Format:</span>
+                            <button type="button" onClick={() => insertContentHtmlForField("title", "<b>", "</b>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs font-bold text-stone-800 hover:bg-stone-100" title="Bold">B</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("title", "<i>", "</i>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs italic text-stone-800 hover:bg-stone-100" title="Italic">I</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("title", "<u>", "</u>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs text-stone-800 underline hover:bg-stone-100" title="Underline">U</button>
+                            <button type="button" onClick={() => insertLinkForField("title")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs text-stone-800 hover:bg-stone-100" title="Link">Link</button>
+                          </div>
+                          <input
+                            ref={titleInputRef}
+                            type="text"
+                            required
+                            value={blogForm.title}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, title: e.target.value }))}
+                            placeholder="Post title"
+                            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-stone-700">Slug (URL)</label>
+                          <input
+                            type="text"
+                            value={blogForm.slug}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, slug: e.target.value }))}
+                            placeholder="auto from title if empty"
+                            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-stone-700">Category</label>
+                          <select
+                            value={blogForm.category}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, category: e.target.value }))}
+                            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          >
+                            {blogCategories.map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-stone-700">Excerpt</label>
+                          <div className="mb-1 flex flex-wrap items-center gap-1 rounded border border-stone-200 bg-stone-50 p-1">
+                            <span className="mr-1 text-xs text-stone-500">Format:</span>
+                            <button type="button" onClick={() => insertContentHtmlForField("excerpt", "<b>", "</b>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs font-bold text-stone-800 hover:bg-stone-100" title="Bold">B</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("excerpt", "<i>", "</i>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs italic text-stone-800 hover:bg-stone-100" title="Italic">I</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("excerpt", "<u>", "</u>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs text-stone-800 underline hover:bg-stone-100" title="Underline">U</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("excerpt", "<h2>", "</h2>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs font-semibold text-stone-800 hover:bg-stone-100" title="H2">H2</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("excerpt", "<h3>", "</h3>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs font-semibold text-stone-800 hover:bg-stone-100" title="H3">H3</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("excerpt", "<p>", "</p>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs text-stone-800 hover:bg-stone-100" title="Paragraph">P</button>
+                            <button type="button" onClick={() => insertContentHtmlForField("excerpt", "<ul><li>", "</li></ul>")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs text-stone-800 hover:bg-stone-100" title="List">• List</button>
+                            <button type="button" onClick={() => insertLinkForField("excerpt")} className="rounded border border-stone-300 bg-white px-1.5 py-1 text-xs text-stone-800 hover:bg-stone-100" title="Link">Link</button>
+                          </div>
+                          <textarea
+                            ref={excerptTextareaRef}
+                            value={blogForm.excerpt}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, excerpt: e.target.value }))}
+                            placeholder="Short summary (HTML allowed)"
+                            rows={3}
+                            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-stone-700">Featured image URL</label>
+                          <input
+                            type="text"
+                            value={blogForm.image}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, image: e.target.value }))}
+                            placeholder="https://..."
+                            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-stone-700">Published date (display)</label>
+                          <input
+                            type="text"
+                            value={blogForm.publishedDate}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, publishedDate: e.target.value }))}
+                            placeholder="e.g. JANUARY 2, 2026"
+                            className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                          />
+                        </div>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={blogForm.featured}
+                            onChange={(e) => setBlogForm((f) => ({ ...f, featured: e.target.checked }))}
+                            className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <span className="text-sm font-medium text-stone-700">Featured</span>
+                        </label>
+                      </div>
+                      <div className="space-y-4 rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
+                        <h3 className="border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">Content (HTML)</h3>
+                        <p className="text-xs text-stone-500">Full article body. Use the toolbar below or type HTML.</p>
+                        <div className="flex flex-wrap items-center gap-1 rounded border border-stone-200 bg-stone-50 p-1.5">
+                          <span className="mr-2 text-xs font-medium text-stone-500">Format:</span>
+                          <button type="button" onClick={() => insertContentHtml("<b>", "</b>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-sm font-bold text-stone-800 hover:bg-stone-100" title="Bold">B</button>
+                          <button type="button" onClick={() => insertContentHtml("<i>", "</i>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-sm italic text-stone-800 hover:bg-stone-100" title="Italic">I</button>
+                          <button type="button" onClick={() => insertContentHtml("<u>", "</u>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-800 underline hover:bg-stone-100" title="Underline">U</button>
+                          <span className="mx-1 w-px self-stretch bg-stone-300" />
+                          <button type="button" onClick={() => insertContentHtml("<h2>", "</h2>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-xs font-semibold text-stone-800 hover:bg-stone-100" title="Heading 2">H2</button>
+                          <button type="button" onClick={() => insertContentHtml("<h3>", "</h3>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-xs font-semibold text-stone-800 hover:bg-stone-100" title="Heading 3">H3</button>
+                          <button type="button" onClick={() => insertContentHtml("<p>", "</p>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-800 hover:bg-stone-100" title="Paragraph">P</button>
+                          <span className="mx-1 w-px self-stretch bg-stone-300" />
+                          <button type="button" onClick={() => insertContentHtml("<ul>\n  <li>", "</li>\n</ul>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-800 hover:bg-stone-100" title="Bullet list">• List</button>
+                          <button type="button" onClick={() => insertContentHtml("<ol>\n  <li>", "</li>\n</ol>")} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-800 hover:bg-stone-100" title="Numbered list">1. List</button>
+                          <span className="mx-1 w-px self-stretch bg-stone-300" />
+                          <button type="button" onClick={insertLink} className="rounded border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-800 hover:bg-stone-100" title="Insert link">Link</button>
+                        </div>
+                        <textarea
+                          ref={contentTextareaRef}
+                          value={blogForm.content}
+                          onChange={(e) => setBlogForm((f) => ({ ...f, content: e.target.value }))}
+                          placeholder="<p>Your content here...</p>"
+                          rows={16}
+                          className="w-full rounded border border-stone-300 px-3 py-2 font-mono text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="rounded border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {submitting ? "Saving…" : (editingBlogId ? "Update Post" : "Create Post")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowBlogForm(false); setEditingBlogId(null); setMessage(null); }}
+                        className="rounded border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </>
               )}
             </>
           )}

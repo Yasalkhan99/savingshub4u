@@ -48,7 +48,7 @@ export default function ContactPage() {
                   <div>
                     <p className="font-medium text-zinc-900">Email</p>
                     <a href="mailto:hello@savingshub4u.com" className="text-sm text-zinc-600 hover:text-red-600">
-                      hello@savingshub4u.com
+                      info@savingshub4u.com
                     </a>
                   </div>
                 </li>

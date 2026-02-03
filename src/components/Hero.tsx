@@ -1,15 +1,19 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { heroPost, featuredPosts } from "@/data/blog";
+import { useBlogData } from "@/components/BlogDataProvider";
+import { stripHtml } from "@/lib/slugify";
 
 export default function Hero() {
+  const { heroPost, featuredPosts } = useBlogData();
   return (
     <section className="relative -mt-14 w-full bg-zinc-900">
       {/* Full-width dark background image - taller hero (extends under navbar so transparent nav shows hero) */}
       <div className="relative h-[78vh] w-full overflow-hidden min-h-[420px] max-h-[620px] md:min-h-[460px] md:max-h-[680px]">
         <Image
-          src={heroPost.image}
-          alt={heroPost.title}
+          src={heroPost.image || "https://picsum.photos/id/1/1200/600"}
+          alt={stripHtml(heroPost.title)}
           fill
           className="object-cover object-center brightness-[0.85]"
           sizes="100vw"
@@ -19,9 +23,7 @@ export default function Hero() {
         {/* Centered white headline on the image (screenshot style) */}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
           <Link href={`/blog/${heroPost.slug}`} className="block group">
-            <h1 className="max-w-4xl text-2xl font-bold leading-tight text-white drop-shadow-lg sm:text-3xl md:text-4xl lg:text-5xl group-hover:underline">
-              {heroPost.title}
-            </h1>
+            <h1 className="max-w-4xl text-2xl font-bold leading-tight text-white drop-shadow-lg sm:text-3xl md:text-4xl lg:text-5xl group-hover:underline [&_a]:text-white [&_a]:underline" dangerouslySetInnerHTML={{ __html: heroPost.title }} />
           </Link>
         </div>
       </div>
@@ -37,7 +39,7 @@ export default function Hero() {
               <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded bg-zinc-100 md:h-24 md:w-28">
                 <Image
                   src={post.image}
-                  alt={post.title}
+                  alt={stripHtml(post.title)}
                   fill
                   className="object-cover transition group-hover:scale-105"
                   sizes="112px"
@@ -47,9 +49,7 @@ export default function Hero() {
                 <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-red-600 md:text-xs">
                   {post.category}
                 </span>
-                <span className="line-clamp-2 text-sm font-semibold leading-snug text-zinc-800 group-hover:underline md:text-base">
-                  {post.title}
-                </span>
+                <span className="line-clamp-2 text-sm font-semibold leading-snug text-zinc-800 group-hover:underline md:text-base [&_a]:text-red-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: post.title }} />
               </div>
             </Link>
           ))}

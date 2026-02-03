@@ -1,8 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { footerCategories } from "@/data/blog";
+import { useBlogData } from "@/components/BlogDataProvider";
+import { stripHtml } from "@/lib/slugify";
 
 export default function Footer() {
+  const { footerCategories } = useBlogData();
   return (
     <footer className="mt-12 bg-zinc-900 text-white">
       {/* Main footer columns - dark grey/black */}
@@ -23,13 +27,13 @@ export default function Footer() {
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-zinc-800">
                         <Image
                           src={post.image}
-                          alt=""
+                          alt={stripHtml(post.title)}
                           fill
                           className="object-cover"
                           sizes="56px"
                         />
                       </div>
-                      <span className="line-clamp-2 flex-1">{post.title}</span>
+                      <span className="line-clamp-2 flex-1 [&_a]:text-zinc-300 [&_a]:hover:text-white" dangerouslySetInnerHTML={{ __html: post.title }} />
                     </Link>
                   </li>
                 ))}
