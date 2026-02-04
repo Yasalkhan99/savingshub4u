@@ -1836,8 +1836,9 @@ export default function AdminPage() {
                     {storeForm.logoMethod === "url" ? (
                       <div className="flex gap-2">
                         <input
+                          key="store-logo-url"
                           type="url"
-                          value={typeof storeForm.logoUrl === "string" ? storeForm.logoUrl : ""}
+                          value={String(storeForm.logoUrl ?? "")}
                           onChange={(e) => setStoreForm((f) => ({ ...f, logoUrl: e.target.value }))}
                           placeholder="Cloudinary URL, direct image URL, or website URL"
                           className="flex-1 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"

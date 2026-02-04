@@ -76,7 +76,7 @@ export default function PromotionsHeader() {
     if (hasFetchedStores || loadingStores) return;
     try {
       setLoadingStores(true);
-      const res = await fetch("/api/stores");
+      const res = await fetch("/api/stores", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load stores");
       const data: StoreSuggestion[] = await res.json();
       const uniqueByName = new Map<string, StoreSuggestion>();

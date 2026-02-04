@@ -220,6 +220,15 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (process.env.VERCEL && !getSupabase()) {
+      return NextResponse.json(
+        {
+          error:
+            "Store create is disabled on Vercel until Supabase is set. In Vercel → Project → Settings → Environment Variables add: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then redeploy.",
+        },
+        { status: 503 }
+      );
+    }
     const slugFromName = String(name)
       .trim()
       .toLowerCase()
