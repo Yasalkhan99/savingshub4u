@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import type { Store } from "@/types/store";
 import type { BlogPost } from "@/data/blog";
@@ -159,6 +159,16 @@ export default function AdminPage() {
     avgUsageRate: string;
   } | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  /** Unique store categories from existing stores (for Category dropdown) */
+  const storeCategories = useMemo(() => {
+    const set = new Set<string>();
+    stores.forEach((s) => {
+      const cat = (s.category ?? "").trim();
+      if (cat) set.add(cat);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [stores]);
 
   const fetchStores = async () => {
     try {
@@ -1111,7 +1121,7 @@ export default function AdminPage() {
                   <div>
                     <label className="mb-1 block text-sm font-medium text-stone-700">Select Store (Optional)</label>
                     <select
-                      value={couponForm.selectedStoreId}
+                      value={couponForm.selectedStoreId ?? ""}
                       onChange={(e) => {
                         const id = e.target.value;
                         setCouponForm((f) => ({
@@ -1160,7 +1170,7 @@ export default function AdminPage() {
                       <input
                         type="text"
                         required
-                        value={couponForm.name}
+                        value={couponForm.name ?? ""}
                         onChange={(e) => setCouponForm((f) => ({ ...f, name: e.target.value }))}
                         placeholder="e.g. Nike, Walmart"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1173,7 +1183,7 @@ export default function AdminPage() {
                       <input
                         type="text"
                         required={couponForm.couponType === "code"}
-                        value={couponForm.couponCode}
+                        value={couponForm.couponCode ?? ""}
                         onChange={(e) => setCouponForm((f) => ({ ...f, couponCode: e.target.value }))}
                         placeholder="e.g. SAVE20"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1184,7 +1194,7 @@ export default function AdminPage() {
                     <label className="mb-1 block text-sm font-medium text-stone-700">Coupon Title (Optional)</label>
                     <input
                       type="text"
-                      value={couponForm.couponTitle}
+                      value={couponForm.couponTitle ?? ""}
                       onChange={(e) => setCouponForm((f) => ({ ...f, couponTitle: e.target.value }))}
                       placeholder="e.g. 20% Off Sitewide"
                       className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1217,7 +1227,7 @@ export default function AdminPage() {
                     {couponForm.logoMethod === "url" && (
                       <input
                         type="url"
-                        value={couponForm.logoUrl}
+                        value={couponForm.logoUrl ?? ""}
                         onChange={(e) => setCouponForm((f) => ({ ...f, logoUrl: e.target.value }))}
                         placeholder="https://..."
                         className="mt-2 w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1228,7 +1238,7 @@ export default function AdminPage() {
                     <label className="mb-1 block text-sm font-medium text-stone-700">Description *</label>
                     <textarea
                       required
-                      value={couponForm.description}
+                      value={couponForm.description ?? ""}
                       onChange={(e) => setCouponForm((f) => ({ ...f, description: e.target.value }))}
                       placeholder="Coupon or deal description"
                       rows={3}
@@ -1239,7 +1249,7 @@ export default function AdminPage() {
                     <label className="mb-1 block text-sm font-medium text-stone-700">Coupon URL (Where user is redirected when clicking &quot;Get Deal&quot;)</label>
                     <input
                       type="url"
-                      value={couponForm.link}
+                      value={couponForm.link ?? ""}
                       onChange={(e) => setCouponForm((f) => ({ ...f, link: e.target.value }))}
                       placeholder="https://example.com/coupon-page"
                       className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1250,7 +1260,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Expiry Date (Optional)</label>
                       <input
                         type="text"
-                        value={couponForm.expiry}
+                        value={couponForm.expiry ?? ""}
                         onChange={(e) => setCouponForm((f) => ({ ...f, expiry: e.target.value }))}
                         placeholder="mm/dd/yyyy or Dec 31, 2026"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1260,7 +1270,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Coupon Image Alt</label>
                       <input
                         type="text"
-                        value={couponForm.imageAlt}
+                        value={couponForm.imageAlt ?? ""}
                         onChange={(e) => setCouponForm((f) => ({ ...f, imageAlt: e.target.value }))}
                         placeholder="Alt text for accessibility and SEO"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1273,7 +1283,7 @@ export default function AdminPage() {
                       <input
                         type="number"
                         min={0}
-                        value={couponForm.priority}
+                        value={couponForm.priority ?? 0}
                         onChange={(e) => setCouponForm((f) => ({ ...f, priority: Number(e.target.value) || 0 }))}
                         className="w-24 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                       />
@@ -1704,20 +1714,45 @@ export default function AdminPage() {
                 <>
               <div className="mb-4">
                 <h2 className="font-serif text-lg font-semibold text-stone-900">{editingStoreId ? "Edit Store" : "Create New Store"}</h2>
-                {storeForm.merchantId.trim() && (
+                {(storeForm.merchantId ?? "").trim() && (
                   <p className="mt-1 text-sm font-medium text-stone-600">Merchant ID: {storeForm.merchantId}</p>
                 )}
               </div>
 
               {message && section === "stores" && (
                 <div
-                  className={`mb-4 rounded border px-4 py-3 text-sm ${
-                    message.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-red-200 bg-red-50 text-red-800"
-                  }`}
+                  className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/50 p-4"
+                  onClick={() => setMessage(null)}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="store-message-title"
                 >
-                  {message.text}
+                  <div
+                    className={`max-w-sm rounded-xl border-2 px-6 py-5 shadow-xl ${
+                      message.type === "success"
+                        ? "border-emerald-300 bg-white text-emerald-800"
+                        : "border-red-300 bg-white text-red-800"
+                    }`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p id="store-message-title" className="mb-4 text-center font-semibold">
+                      {message.type === "success" ? "Success" : "Error"}
+                    </p>
+                    <p className="mb-5 text-center text-sm">{message.text}</p>
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setMessage(null)}
+                        className={`rounded-lg px-5 py-2 text-sm font-medium ${
+                          message.type === "success"
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                            : "bg-red-600 text-white hover:bg-red-700"
+                        }`}
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1733,7 +1768,7 @@ export default function AdminPage() {
                       <input
                         type="text"
                         required
-                        value={storeForm.name}
+                        value={storeForm.name ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, name: e.target.value }))}
                         placeholder="Store Name (e.g., Nike)"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1743,7 +1778,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Sub Store Name (Displayed on store page)</label>
                       <input
                         type="text"
-                        value={storeForm.subStoreName}
+                        value={storeForm.subStoreName ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, subStoreName: e.target.value }))}
                         placeholder="e.g., Nike Official Store"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1755,7 +1790,7 @@ export default function AdminPage() {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          value={storeForm.slugAuto ? (storeForm.name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")) : storeForm.slug}
+                          value={storeForm.slugAuto ? ((storeForm.name ?? "").trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")) : (storeForm.slug ?? "")}
                           onChange={(e) => setStoreForm((f) => ({ ...f, slug: e.target.value, slugAuto: false }))}
                           placeholder="auto-generated"
                           disabled={storeForm.slugAuto}
@@ -1802,7 +1837,7 @@ export default function AdminPage() {
                       <div className="flex gap-2">
                         <input
                           type="url"
-                          value={storeForm.logoUrl}
+                          value={typeof storeForm.logoUrl === "string" ? storeForm.logoUrl : ""}
                           onChange={(e) => setStoreForm((f) => ({ ...f, logoUrl: e.target.value }))}
                           placeholder="Cloudinary URL, direct image URL, or website URL"
                           className="flex-1 rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1844,7 +1879,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Logo Alt Text (Optional)</label>
                       <input
                         type="text"
-                        value={storeForm.logoAltText}
+                        value={storeForm.logoAltText ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, logoAltText: e.target.value }))}
                         placeholder="Store logo"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1854,7 +1889,7 @@ export default function AdminPage() {
                     <div>
                       <label className="mb-1 block text-sm font-medium text-stone-700">Description (Optional)</label>
                       <textarea
-                        value={storeForm.description}
+                        value={storeForm.description ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, description: e.target.value }))}
                         placeholder="Store Description"
                         rows={3}
@@ -1872,7 +1907,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Network ID (Region)</label>
                       <input
                         type="text"
-                        value={storeForm.networkId}
+                        value={storeForm.networkId ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, networkId: e.target.value }))}
                         placeholder="Enter numeric Network ID (e.g., 1, 2, 100)"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1883,7 +1918,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Merchant ID</label>
                       <input
                         type="text"
-                        value={storeForm.merchantId}
+                        value={storeForm.merchantId ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, merchantId: e.target.value }))}
                         placeholder="Enter Merchant ID"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1894,7 +1929,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Tracking URL</label>
                       <input
                         type="url"
-                        value={storeForm.trackingUrl}
+                        value={storeForm.trackingUrl ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, trackingUrl: e.target.value }))}
                         placeholder="https://example.com/tracking-url"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1905,7 +1940,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Country Codes</label>
                       <input
                         type="text"
-                        value={storeForm.countryCodes}
+                        value={storeForm.countryCodes ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, countryCodes: e.target.value }))}
                         placeholder="US, GB, DE, FR (comma-separated)"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1916,7 +1951,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Store Website URL (Display)</label>
                       <input
                         type="url"
-                        value={storeForm.websiteUrl}
+                        value={storeForm.websiteUrl ?? ""}
                         onChange={(e) => setStoreForm((f) => ({ ...f, websiteUrl: e.target.value }))}
                         placeholder="https://example.com"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -1928,7 +1963,7 @@ export default function AdminPage() {
 
                 {/* Full width: Category, Why Trust Us, More Info, SEO, Trending */}
                 <div className="rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
-                  {storeForm.networkId.trim() && (
+                  {(storeForm.networkId ?? "").trim() && (
                     <h2 className="mb-3 text-base font-semibold text-stone-700">Network ID: {storeForm.networkId}</h2>
                   )}
                   <h3 className="mb-4 border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
@@ -1937,18 +1972,21 @@ export default function AdminPage() {
                   <div className="mb-4">
                     <label className="mb-1 block text-sm font-medium text-stone-700">Category</label>
                     <select
-                      value={storeForm.category}
+                      value={storeForm.category ?? ""}
                       onChange={(e) => setStoreForm((f) => ({ ...f, category: e.target.value }))}
                       className="w-full max-w-xs rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                     >
                       <option value="">No Category</option>
+                      {storeCategories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
                     </select>
                     <p className="mt-1 text-xs text-stone-500">Assign this store to a category.</p>
                   </div>
                   <div className="mb-4">
                     <label className="mb-1 block text-sm font-medium text-stone-700">Why Trust Us Section (Optional)</label>
                     <textarea
-                      value={storeForm.whyTrustUs}
+                      value={storeForm.whyTrustUs ?? ""}
                       onChange={(e) => setStoreForm((f) => ({ ...f, whyTrustUs: e.target.value }))}
                       placeholder="Why should customers trust this store? Enter custom content here..."
                       rows={2}
@@ -1959,7 +1997,7 @@ export default function AdminPage() {
                   <div className="mb-4">
                     <label className="mb-1 block text-sm font-medium text-stone-700">More Information Section (Optional)</label>
                     <textarea
-                      value={storeForm.moreInfo}
+                      value={storeForm.moreInfo ?? ""}
                       onChange={(e) => setStoreForm((f) => ({ ...f, moreInfo: e.target.value }))}
                       placeholder="Enter detailed information about the store, coupons, how to use them, etc. You can use HTML tags for formatting."
                       rows={3}
@@ -1974,7 +2012,7 @@ export default function AdminPage() {
                     <label className="mb-1 block text-sm font-medium text-stone-700">SEO Page Title (Optional)</label>
                     <input
                       type="text"
-                      value={storeForm.seoTitle}
+                      value={storeForm.seoTitle ?? ""}
                       onChange={(e) => setStoreForm((f) => ({ ...f, seoTitle: e.target.value }))}
                       placeholder="{store_name} Coupons & Deals {month_year} - Save"
                       maxLength={100}
@@ -1986,7 +2024,7 @@ export default function AdminPage() {
                   <div>
                     <label className="mb-1 block text-sm font-medium text-stone-700">SEO Meta Description (Optional)</label>
                     <textarea
-                      value={storeForm.seoMetaDesc}
+                      value={storeForm.seoMetaDesc ?? ""}
                       onChange={(e) => setStoreForm((f) => ({ ...f, seoMetaDesc: e.target.value }))}
                       placeholder="Get the latest Nike coupons & save up to 70%!"
                       maxLength={160}
@@ -2129,7 +2167,7 @@ export default function AdminPage() {
                     <div className="mb-4">
                       <label className="mb-1 block text-sm font-medium text-stone-700">Store</label>
                       <select
-                        value={uploadLogoStoreId}
+                        value={uploadLogoStoreId ?? ""}
                         onChange={(e) => setUploadLogoStoreId(e.target.value)}
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                       >
@@ -2143,7 +2181,7 @@ export default function AdminPage() {
                       <label className="mb-1 block text-sm font-medium text-stone-700">Logo URL</label>
                       <input
                         type="url"
-                        value={uploadLogoUrl}
+                        value={uploadLogoUrl ?? ""}
                         onChange={(e) => setUploadLogoUrl(e.target.value)}
                         placeholder="https://example.com/logo.png"
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -2315,7 +2353,7 @@ export default function AdminPage() {
                             ref={titleInputRef}
                             type="text"
                             required
-                            value={blogForm.title}
+                            value={blogForm.title ?? ""}
                             onChange={(e) => setBlogForm((f) => ({ ...f, title: e.target.value }))}
                             placeholder="Post title"
                             className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -2325,7 +2363,7 @@ export default function AdminPage() {
                           <label className="mb-1 block text-sm font-medium text-stone-700">Slug (URL)</label>
                           <input
                             type="text"
-                            value={blogForm.slug}
+                            value={blogForm.slug ?? ""}
                             onChange={(e) => setBlogForm((f) => ({ ...f, slug: e.target.value }))}
                             placeholder="auto from title if empty"
                             className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -2334,7 +2372,7 @@ export default function AdminPage() {
                         <div>
                           <label className="mb-1 block text-sm font-medium text-stone-700">Category</label>
                           <select
-                            value={blogForm.category}
+                            value={blogForm.category ?? ""}
                             onChange={(e) => setBlogForm((f) => ({ ...f, category: e.target.value as (typeof blogCategories)[number] }))}
                             className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                           >
@@ -2358,7 +2396,7 @@ export default function AdminPage() {
                           </div>
                           <textarea
                             ref={excerptTextareaRef}
-                            value={blogForm.excerpt}
+                            value={blogForm.excerpt ?? ""}
                             onChange={(e) => setBlogForm((f) => ({ ...f, excerpt: e.target.value }))}
                             placeholder="Short summary (HTML allowed)"
                             rows={3}
@@ -2369,7 +2407,7 @@ export default function AdminPage() {
                           <label className="mb-1 block text-sm font-medium text-stone-700">Featured image URL</label>
                           <input
                             type="text"
-                            value={blogForm.image}
+                            value={blogForm.image ?? ""}
                             onChange={(e) => setBlogForm((f) => ({ ...f, image: e.target.value }))}
                             placeholder="https://..."
                             className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -2379,7 +2417,7 @@ export default function AdminPage() {
                           <label className="mb-1 block text-sm font-medium text-stone-700">Published date (display)</label>
                           <input
                             type="text"
-                            value={blogForm.publishedDate}
+                            value={blogForm.publishedDate ?? ""}
                             onChange={(e) => setBlogForm((f) => ({ ...f, publishedDate: e.target.value }))}
                             placeholder="e.g. JANUARY 2, 2026"
                             className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -2415,7 +2453,7 @@ export default function AdminPage() {
                         </div>
                         <textarea
                           ref={contentTextareaRef}
-                          value={blogForm.content}
+                          value={blogForm.content ?? ""}
                           onChange={(e) => setBlogForm((f) => ({ ...f, content: e.target.value }))}
                           placeholder="<p>Your content here...</p>"
                           rows={16}

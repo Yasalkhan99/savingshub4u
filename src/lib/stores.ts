@@ -23,15 +23,23 @@ export type StorePageData = {
   otherStores: Store[];
 };
 
+/** True if this row has actual coupon/deal data (not just store-only row from Create Store). */
+function hasCouponData(s: { couponCode?: string; couponTitle?: string }): boolean {
+  const code = (s.couponCode ?? "").trim();
+  const title = (s.couponTitle ?? "").trim();
+  return code !== "" || title !== "";
+}
+
 export async function getStorePageData(slug: string): Promise<StorePageData> {
   const all = await getStores();
   const enabled = all.filter((s) => s.status !== "disable");
-  const coupons = enabled.filter((s) => {
+  const matching = enabled.filter((s) => {
     const sSlug = (s.slug || slugify(s.name)).toLowerCase();
     const want = slug.toLowerCase();
     return sSlug === want || s.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") === want;
   });
-  const storeInfo = coupons[0] ?? null;
+  const storeInfo = matching[0] ?? null;
+  const coupons = matching.filter(hasCouponData);
   const currentName = storeInfo?.name?.toLowerCase();
   const otherStores = enabled
     .filter((s) => s.name?.toLowerCase() !== currentName)
