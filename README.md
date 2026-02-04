@@ -10,7 +10,7 @@ Blog-based homepage for a coupon & savings website. Built with Next.js 16, TypeS
 - **Header** – Logo (SavingsHub4u), nav (NEWS, DEALS, REVIEWS, LIFESTYLE, BEAUTY), search & account icons
 - **Blog post pages** – `/blog/[slug]` for individual articles
 
-## Run locally
+## Run locally.
 
 ```bash
 npm install
