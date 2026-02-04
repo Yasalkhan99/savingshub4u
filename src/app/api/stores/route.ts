@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import type { Store } from "@/types/store";
-import { getSupabase, SUPABASE_STORES_TABLE } from "@/lib/supabase-server";
+import { getSupabase, SUPABASE_STORES_TABLE, SUPABASE_COUPONS_TABLE } from "@/lib/supabase-server";
+import { getCoupons, insertCoupon, updateCoupon, deleteCouponById } from "@/lib/stores";
+import { hasCouponData } from "@/lib/store-utils";
 
 const getStoresPath = () => path.join(process.cwd(), "data", "stores.json");
 
@@ -264,7 +266,10 @@ export async function POST(request: Request) {
     if (active === false) (newStore as Store).active = false;
     if (active === true) (newStore as Store).active = true;
     if (imageAlt != null && String(imageAlt).trim() !== "") (newStore as Store).imageAlt = String(imageAlt).trim();
-    if (getSupabase()) {
+    const isCoupon = hasCouponData(newStore);
+    if (isCoupon) {
+      await insertCoupon(newStore);
+    } else if (getSupabase()) {
       await insertStore(newStore);
     } else {
       stores.push(newStore);
@@ -287,13 +292,28 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id");
     const all = searchParams.get("all");
     const stores = await readStores();
+    const coupons = await getCoupons();
     if (all === "true") {
-      if (getSupabase()) await deleteAllStoresFromSupabase();
-      else await writeStoresToFile([]);
-      return NextResponse.json({ deleted: stores.length });
+      if (getSupabase()) {
+        await deleteAllStoresFromSupabase();
+        const supabase = getSupabase()!;
+        const { error: couponErr } = await supabase.from(SUPABASE_COUPONS_TABLE).delete().neq("id", " ");
+        if (couponErr) console.error("[coupons] delete all error:", couponErr.message);
+      } else {
+        await writeStoresToFile([]);
+        const { writeFile, mkdir } = await import("fs/promises");
+        await mkdir(path.dirname(getStoresPath()), { recursive: true });
+        await writeFile(path.join(process.cwd(), "data", "coupons.json"), "[]", "utf-8");
+      }
+      return NextResponse.json({ deleted: stores.length + coupons.length });
     }
     if (!id) {
       return NextResponse.json({ error: "id or all required" }, { status: 400 });
+    }
+    const inCoupons = coupons.some((c) => c.id === id);
+    if (inCoupons) {
+      await deleteCouponById(id);
+      return NextResponse.json({ deleted: 1 });
     }
     const nextStores = stores.filter((s) => s.id !== id);
     if (nextStores.length === stores.length) {
@@ -313,6 +333,25 @@ export async function PATCH(request: Request) {
     const { id, ...updates } = body;
     if (!id || typeof id !== "string") {
       return NextResponse.json({ error: "id required" }, { status: 400 });
+    }
+    const coupons = await getCoupons();
+    const couponIndex = coupons.findIndex((c) => c.id === id);
+    if (couponIndex >= 0) {
+      const current = coupons[couponIndex];
+      const allowed = [
+        "name", "logoUrl", "description", "expiry", "link", "subStoreName", "slug",
+        "logoAltText", "logoMethod", "trackingUrl", "countryCodes",
+        "websiteUrl", "category", "whyTrustUs", "moreInfo", "seoTitle", "seoMetaDesc",
+        "trending", "status", "faqs", "couponType", "couponCode", "couponTitle", "priority", "active", "imageAlt",
+      ];
+      const nextCoupon = { ...current };
+      for (const key of allowed) {
+        if (key in updates && updates[key] !== undefined) {
+          (nextCoupon as Record<string, unknown>)[key] = key === "faqs" ? updates[key] : (typeof updates[key] === "string" ? updates[key].trim() : updates[key]);
+        }
+      }
+      await updateCoupon(id, nextCoupon);
+      return NextResponse.json(nextCoupon);
     }
     const stores = await readStores();
     const index = stores.findIndex((s) => s.id === id);

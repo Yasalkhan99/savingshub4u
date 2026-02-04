@@ -49,6 +49,7 @@ function parseCSVLine(line: string): string[] {
 export default function AdminPage() {
   const [section, setSection] = useState<Section>("dashboard");
   const [stores, setStores] = useState<Store[]>([]);
+  const [couponsFromTable, setCouponsFromTable] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -173,11 +174,17 @@ export default function AdminPage() {
 
   const fetchStores = async () => {
     try {
-      const res = await fetch("/api/stores");
-      const data = await res.json();
-      setStores(Array.isArray(data) ? data : []);
+      const [storesRes, couponsRes] = await Promise.all([
+        fetch("/api/stores", { cache: "no-store" }),
+        fetch("/api/coupons", { cache: "no-store" }),
+      ]);
+      const storesData = await storesRes.json();
+      const couponsData = await couponsRes.json();
+      setStores(Array.isArray(storesData) ? storesData : []);
+      setCouponsFromTable(Array.isArray(couponsData) ? couponsData : []);
     } catch {
       setStores([]);
+      setCouponsFromTable([]);
     } finally {
       setLoading(false);
     }
@@ -430,7 +437,10 @@ export default function AdminPage() {
 
   const filteredStores =
     storeFilter === "all" ? stores : stores.filter((s) => s.name === storeFilter);
-  const couponRowsOnly = stores.filter(hasCouponData);
+  const couponRowsOnly = [
+    ...stores.filter(hasCouponData),
+    ...couponsFromTable.filter(hasCouponData),
+  ];
   const totalCoupons = couponRowsOnly.length;
   const activeCoupons = couponRowsOnly.filter((s) => s.status !== "disable").length;
 
@@ -970,6 +980,27 @@ export default function AdminPage() {
                   >
                     Delete All Coupons
                   </button>
+                  {stores.filter(hasCouponData).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!confirm("Move all coupon rows from stores table to coupons table? Run once after creating the coupons table in Supabase.")) return;
+                        setMessage(null);
+                        try {
+                          const res = await fetch("/api/coupons/migrate", { method: "POST" });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(data.error ?? "Migration failed");
+                          setMessage({ type: "success", text: `Migrated ${data.migrated ?? 0} coupon(s) to coupons table.` });
+                          await fetchStores();
+                        } catch (e) {
+                          setMessage({ type: "error", text: e instanceof Error ? e.message : "Migration failed." });
+                        }
+                      }}
+                      className="rounded border border-stone-300 bg-violet-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+                    >
+                      Migrate to coupons table
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2081,11 +2112,16 @@ export default function AdminPage() {
                   <h3 className="mb-3 font-serif text-base font-semibold text-stone-900">Coupons for this store</h3>
                   {(() => {
                     const storeKeyForm = (storeForm.slug || slugify(storeForm.name ?? "")).toLowerCase().trim() || (storeForm.name ?? "").toLowerCase().trim();
-                    const hasCouponData = (row: Store) => (String(row.couponCode ?? "").trim() !== "" || String(row.couponTitle ?? "").trim() !== "");
-                    const couponsForThisStore = stores.filter((row) => {
-                      const key = (row.slug || slugify(row.name)).toLowerCase().trim() || row.name.toLowerCase().trim();
-                      return key === storeKeyForm && hasCouponData(row);
-                    });
+                    const couponsForThisStore = [
+                      ...stores.filter((row) => {
+                        const key = (row.slug || slugify(row.name)).toLowerCase().trim() || row.name.toLowerCase().trim();
+                        return key === storeKeyForm && hasCouponData(row);
+                      }),
+                      ...couponsFromTable.filter((row) => {
+                        const key = (row.slug || slugify(row.name ?? "")).toLowerCase().trim() || (row.name ?? "").toLowerCase().trim();
+                        return key === storeKeyForm && hasCouponData(row);
+                      }),
+                    ];
                     return (
                       <>
                         {couponsForThisStore.length > 0 && (
