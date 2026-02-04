@@ -1,9 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import PromotionsHeader from "@/components/PromotionsHeader";
+import Pagination from "@/components/Pagination";
 import { getStores, slugify } from "@/lib/stores";
 import { getBlogData } from "@/lib/blog";
 import { stripHtml } from "@/lib/slugify";
+
+const PER_PAGE = 24;
 
 const PROMO_CATEGORIES = [
   { name: "Baby & Kids", icon: "👶", accent: "from-rose-100 to-pink-100" },
@@ -20,8 +23,16 @@ const PROMO_CATEGORIES = [
   { name: "Electronics", icon: "📱", accent: "from-slate-100 to-zinc-200" },
 ];
 
-export default async function PromotionsPage() {
+export default async function PromotionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageStr } = await searchParams;
+  const currentPage = Math.max(1, parseInt(String(pageStr || "1"), 10) || 1);
   const stores = await getStores();
+  const totalPages = Math.max(1, Math.ceil(stores.length / PER_PAGE));
+  const pageStores = stores.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
   const { featuredPosts } = await getBlogData();
 
   return (
@@ -46,8 +57,12 @@ export default async function PromotionsPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {stores.map((store) => (
+            <>
+              <p className="mb-4 text-sm text-zinc-500">
+                Showing {(currentPage - 1) * PER_PAGE + 1}–{Math.min(currentPage * PER_PAGE, stores.length)} of {stores.length} stores
+              </p>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {pageStores.map((store) => (
                 <article
                   key={store.id}
                   className="flex flex-col overflow-hidden rounded-lg border border-zinc-100 bg-white p-5 shadow-md transition hover:shadow-lg"
@@ -83,6 +98,13 @@ export default async function PromotionsPage() {
                 </article>
               ))}
             </div>
+              <Pagination
+                basePath="/promotions"
+                currentPage={currentPage}
+                totalPages={totalPages}
+                searchParams={pageStr ? { page: pageStr } : {}}
+              />
+            </>
           )}
         </section>
 

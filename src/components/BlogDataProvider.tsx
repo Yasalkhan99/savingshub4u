@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext } from "react";
+import type { ReactNode } from "react";
 import type { BlogPost } from "@/data/blog";
 import type { NavDropdownPost } from "@/data/blog";
 
@@ -29,11 +30,10 @@ export function BlogDataProvider({
   children,
 }: {
   initialData: BlogDataContextValue;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  const value = useMemo(() => initialData, [initialData]);
   return (
-    <BlogDataContext.Provider value={value}>
+    <BlogDataContext.Provider value={initialData}>
       {children}
     </BlogDataContext.Provider>
   );

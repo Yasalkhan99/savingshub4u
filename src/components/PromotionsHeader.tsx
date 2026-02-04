@@ -1,10 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { slugify } from "@/lib/slugify";
 
 const navLinks = [
   { label: "Home", href: "/" },
   { label: "Categories", href: "/categories" },
-  { label: "More", href: "/more" },
-  { label: "Promotions", href: "/promotions", active: true },
+  { label: "Brands", href: "/brands" },
+  { label: "Promotions", href: "/promotions" },
+  { label: "About Us", href: "/about" },
+  { label: "Share A Coupon", href: "/promotions/share-a-coupon" },
 ];
 
 function FacebookIcon({ className }: { className?: string }) {
@@ -47,7 +55,93 @@ function YouTubeIcon({ className }: { className?: string }) {
   );
 }
 
+type StoreSuggestion = {
+  id: string;
+  name: string;
+  slug?: string;
+  logoUrl?: string;
+};
+
 export default function PromotionsHeader() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [storesList, setStoresList] = useState<StoreSuggestion[]>([]);
+  const [hasFetchedStores, setHasFetchedStores] = useState(false);
+  const [loadingStores, setLoadingStores] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
+
+  const loadStores = useCallback(async () => {
+    if (hasFetchedStores || loadingStores) return;
+    try {
+      setLoadingStores(true);
+      const res = await fetch("/api/stores");
+      if (!res.ok) throw new Error("Failed to load stores");
+      const data: StoreSuggestion[] = await res.json();
+      const uniqueByName = new Map<string, StoreSuggestion>();
+      data.forEach((s) => {
+        const key = (s.name || "").trim().toLowerCase();
+        if (!key || uniqueByName.has(key)) return;
+        uniqueByName.set(key, {
+          id: s.id,
+          name: s.name,
+          slug: s.slug,
+          logoUrl: s.logoUrl,
+        });
+      });
+      setStoresList(
+        Array.from(uniqueByName.values()).sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+        ),
+      );
+      setHasFetchedStores(true);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingStores(false);
+    }
+  }, [hasFetchedStores, loadingStores]);
+
+  useEffect(() => {
+    loadStores();
+  }, [loadStores]);
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (!searchWrapperRef.current?.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const normalizedTerm = searchTerm.trim().toLowerCase();
+  const filteredSuggestions = useMemo(() => {
+    if (!normalizedTerm) return [];
+    return storesList
+      .filter((store) => store.name.toLowerCase().startsWith(normalizedTerm))
+      .slice(0, 8);
+  }, [storesList, normalizedTerm]);
+
+  const handleSelectStore = useCallback(
+    (store: StoreSuggestion) => {
+      const slug = store.slug || slugify(store.name);
+      setShowSuggestions(false);
+      setSearchTerm("");
+      router.push(`/stores/${slug}`);
+    },
+    [router],
+  );
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && filteredSuggestions.length > 0) {
+      event.preventDefault();
+      handleSelectStore(filteredSuggestions[0]);
+    }
+  };
+
   return (
     <header className="border-b border-zinc-200 bg-white shadow-sm">
       {/* Thin top bar */}
@@ -67,7 +161,7 @@ export default function PromotionsHeader() {
             SavingsHub4u
           </Link>
           <div className="flex-1 md:mx-10 md:max-w-md">
-            <div className="relative">
+            <div className="relative" ref={searchWrapperRef}>
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -76,8 +170,58 @@ export default function PromotionsHeader() {
               <input
                 type="search"
                 placeholder="Find your favorite stores"
+                value={searchTerm}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSearchTerm(value);
+                  setShowSuggestions(Boolean(value));
+                }}
+                onFocus={() => {
+                  if (searchTerm.trim()) setShowSuggestions(true);
+                }}
+                onKeyDown={handleKeyDown}
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50/80 py-3 pl-11 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 transition-colors focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-400/20"
               />
+              {showSuggestions && (
+                <div className="absolute left-0 right-0 top-full z-30 mt-2 rounded-2xl border border-zinc-200 bg-white shadow-2xl">
+                  {loadingStores ? (
+                    <p className="px-4 py-3 text-sm text-zinc-500">Loading stores…</p>
+                  ) : normalizedTerm.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-zinc-500">Start typing to search stores</p>
+                  ) : filteredSuggestions.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-zinc-500">No stores found for “{searchTerm}”</p>
+                  ) : (
+                    <ul className="max-h-72 overflow-y-auto">
+                      {filteredSuggestions.map((store) => (
+                        <li key={store.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectStore(store)}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-zinc-700 hover:bg-zinc-50"
+                          >
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-600 overflow-hidden">
+                              {store.logoUrl ? (
+                                <Image
+                                  src={store.logoUrl}
+                                  alt={store.name}
+                                  width={36}
+                                  height={36}
+                                  className="h-full w-full object-contain"
+                                  unoptimized
+                                />
+                              ) : (
+                                store.name.slice(0, 2).toUpperCase()
+                              )}
+                            </span>
+                            <span className="flex-1 truncate">{store.name}</span>
+                            <span className="text-xs uppercase tracking-wide text-blue-500">View</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -129,20 +273,21 @@ export default function PromotionsHeader() {
           </div>
         </div>
         {/* Nav: Home, Categories, More, Promotions */}
-        <nav className="mt-5 flex gap-8 border-t border-zinc-100 pt-5">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`text-sm font-medium transition-colors ${
-                link.active
-                  ? "border-b-2 border-blue-600 text-blue-600 pb-1"
-                  : "text-zinc-600 hover:text-zinc-900"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
+        <nav className="mt-5 flex flex-wrap gap-6 border-t border-zinc-100 pt-5 sm:gap-8">
+          {navLinks.map((link) => {
+            const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-sm font-medium uppercase tracking-wide transition-colors ${
+                  active ? "border-b-2 border-blue-600 text-blue-600 pb-1" : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </header>
