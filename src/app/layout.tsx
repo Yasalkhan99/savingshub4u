@@ -15,14 +15,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SavingsHub4u – Deals, Coupons & Savings Blog",
+  title: {
+    default: "SavingsHub4u – Your Gateway to Smart Savings & Best Coupons",
+    template: "%s | SavingsHub4u",
+  },
   description:
-    "SavingsHub4u.com – Your go-to blog for the best deals, coupons, reviews, and money-saving tips. News, lifestyle, beauty & more.",
+    "Save smarter with SavingsHub4u. Verified coupon codes, exclusive deals, and money-saving tips from top brands. Your personal savings partner for online shopping.",
+  keywords: ["coupons", "deals", "promo codes", "savings", "discounts", "SavingsHub4u"],
   metadataBase: new URL("https://savingshub4u.com"),
+  icons: {
+    icon: "/Logo%20Icon.png",
+    apple: "/Logo%20Icon.png",
+  },
   openGraph: {
-    title: "SavingsHub4u – Deals, Coupons & Savings Blog",
-    description: "Best deals, coupons, reviews and savings tips.",
+    title: "SavingsHub4u – Your Gateway to Smart Savings & Best Coupons",
+    description: "Save smarter with verified coupon codes and exclusive deals from top brands. Your personal savings partner.",
     url: "https://savingshub4u.com",
+    siteName: "SavingsHub4u",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SavingsHub4u – Smart Savings & Best Coupons",
+    description: "Verified coupon codes, exclusive deals & money-saving tips. Your personal savings partner.",
   },
 };
 

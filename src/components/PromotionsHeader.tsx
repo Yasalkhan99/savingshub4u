@@ -149,16 +149,15 @@ export default function PromotionsHeader() {
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
         {/* Top row: logo, search, social */}
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 text-xl font-bold text-blue-600 transition-colors hover:text-blue-700"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-              <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
-            </span>
-            SavingsHub4u
+          <Link href="/" className="flex items-center" aria-label="SavingsHub4u">
+            <Image
+              src="/Logo%20Container.svg"
+              alt="SavingsHub4u"
+              width={180}
+              height={36}
+              priority
+              className="h-9 w-auto object-contain"
+            />
           </Link>
           <div className="flex-1 md:mx-10 md:max-w-md">
             <div className="relative" ref={searchWrapperRef}>

@@ -105,14 +105,15 @@ export default function Header({ transparent }: HeaderProps = {}) {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-12 items-center justify-between gap-4 sm:h-14">
-          <Link
-            href="/"
-            className={`flex items-center gap-2 text-base font-bold tracking-tight sm:text-lg ${textClass}`}
-          >
-            <svg className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-            SavingsHub4u
+          <Link href="/" className="flex items-center" aria-label="SavingsHub4u">
+            <Image
+              src={scrolled ? "/Logo%20Container.svg" : "/Logo%20Container%201.svg"}
+              alt="SavingsHub4u"
+              width={160}
+              height={32}
+              priority
+              className="h-8 w-auto object-contain"
+            />
           </Link>
 
           <nav className="hidden items-center gap-6 md:flex lg:gap-8">
