@@ -41,3 +41,16 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - **Vercel**: Connect this repo; Vercel will detect Next.js and build automatically.
 - **Custom domain**: Set `savingshub4u.com` in your hosting provider’s DNS and project settings.
+
+### Live site: store create / edit (Supabase)
+
+On Vercel (and other serverless hosts), the app cannot write to `data/stores.json`, so **creating or editing stores on the live site will not persist** unless you use Supabase:
+
+1. Use a [Supabase](https://supabase.com) project. If you use the **Supabase MCP** (`user-supabase`) with this repo, the `stores` table is already created via migration.
+2. If the table is not created yet: in Supabase **SQL Editor**, run the script in `supabase-stores-table.sql`.
+3. In **Vercel → Project → Settings → Environment Variables**, add (see `.env.example`):
+   - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase project URL (e.g. `https://xxxx.supabase.co`)
+   - `SUPABASE_SERVICE_ROLE_KEY` = your Supabase **service_role** key (Dashboard → Project Settings → API)
+4. Redeploy the app.
+
+After that, store create/edit/delete on the live site will persist in Supabase. Locally, the app still uses `data/stores.json` if Supabase env vars are not set.

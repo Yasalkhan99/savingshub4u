@@ -2,12 +2,13 @@ import path from "path";
 import { readFile } from "fs/promises";
 import type { Store } from "@/types/store";
 import { slugify } from "./slugify";
+import { getSupabase, SUPABASE_STORES_TABLE } from "./supabase-server";
 
 const getStoresPath = () => path.join(process.cwd(), "data", "stores.json");
 
 export { slugify };
 
-export async function getStores(): Promise<Store[]> {
+async function getStoresFromFile(): Promise<Store[]> {
   try {
     const filePath = getStoresPath();
     const data = await readFile(filePath, "utf-8");
@@ -15,6 +16,19 @@ export async function getStores(): Promise<Store[]> {
   } catch {
     return [];
   }
+}
+
+export async function getStores(): Promise<Store[]> {
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data: rows, error } = await supabase.from(SUPABASE_STORES_TABLE).select("data");
+    if (!error && rows?.length) {
+      const stores = rows.map((r: { data: Store }) => r.data).filter(Boolean);
+      stores.sort((a, b) => ((b.createdAt ?? "").localeCompare(a.createdAt ?? "")));
+      return stores;
+    }
+  }
+  return getStoresFromFile();
 }
 
 export type StorePageData = {

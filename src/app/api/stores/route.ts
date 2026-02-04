@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import type { Store } from "@/types/store";
+import { getSupabase, SUPABASE_STORES_TABLE } from "@/lib/supabase-server";
 
 const getStoresPath = () => path.join(process.cwd(), "data", "stores.json");
 
-async function readStores(): Promise<Store[]> {
+async function readStoresFromFile(): Promise<Store[]> {
   try {
     const filePath = getStoresPath();
     const data = await readFile(filePath, "utf-8");
@@ -15,11 +16,72 @@ async function readStores(): Promise<Store[]> {
   }
 }
 
-async function writeStores(stores: Store[]) {
+async function readStoresFromSupabase(): Promise<Store[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data: rows, error } = await supabase.from(SUPABASE_STORES_TABLE).select("data");
+  if (error) {
+    console.error("[stores] Supabase read error:", error.message);
+    return [];
+  }
+  const stores = (rows ?? []).map((r: { data: Store }) => r.data).filter(Boolean);
+  stores.sort((a, b) => {
+    const aAt = a.createdAt ?? "";
+    const bAt = b.createdAt ?? "";
+    return bAt.localeCompare(aAt);
+  });
+  return stores;
+}
+
+async function readStores(): Promise<Store[]> {
+  if (getSupabase()) return readStoresFromSupabase();
+  return readStoresFromFile();
+}
+
+async function writeStoresToFile(stores: Store[]) {
   const filePath = getStoresPath();
   const dir = path.dirname(filePath);
   await mkdir(dir, { recursive: true });
   await writeFile(filePath, JSON.stringify(stores, null, 2), "utf-8");
+}
+
+async function writeStores(stores: Store[]) {
+  if (!getSupabase()) return writeStoresToFile(stores);
+  const supabase = getSupabase()!;
+  const { error: delErr } = await supabase.from(SUPABASE_STORES_TABLE).delete().neq("id", " ");
+  if (delErr) throw new Error(delErr.message);
+  if (stores.length === 0) return;
+  const rows = stores.map((s) => ({ id: s.id, data: s }));
+  const { error } = await supabase.from(SUPABASE_STORES_TABLE).insert(rows);
+  if (error) throw new Error(error.message);
+}
+
+async function insertStore(store: Store) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from(SUPABASE_STORES_TABLE).insert({ id: store.id, data: store });
+  if (error) throw new Error(error.message);
+}
+
+async function updateStore(id: string, store: Store) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from(SUPABASE_STORES_TABLE).update({ data: store }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteStoreById(id: string) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from(SUPABASE_STORES_TABLE).delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+async function deleteAllStoresFromSupabase() {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { error } = await supabase.from(SUPABASE_STORES_TABLE).delete().neq("id", " ");
+  if (error) throw new Error(error.message);
 }
 
 export async function GET() {
@@ -197,11 +259,16 @@ export async function POST(request: Request) {
     if (active === false) (newStore as Store).active = false;
     if (active === true) (newStore as Store).active = true;
     if (imageAlt != null && String(imageAlt).trim() !== "") (newStore as Store).imageAlt = String(imageAlt).trim();
-    stores.push(newStore);
-    await writeStores(stores);
+    if (getSupabase()) {
+      await insertStore(newStore);
+    } else {
+      stores.push(newStore);
+      await writeStoresToFile(stores);
+    }
     return NextResponse.json(newStore);
   } catch (e) {
-    return NextResponse.json({ error: "Failed to add store" }, { status: 500 });
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -212,7 +279,8 @@ export async function DELETE(request: Request) {
     const all = searchParams.get("all");
     const stores = await readStores();
     if (all === "true") {
-      await writeStores([]);
+      if (getSupabase()) await deleteAllStoresFromSupabase();
+      else await writeStoresToFile([]);
       return NextResponse.json({ deleted: stores.length });
     }
     if (!id) {
@@ -222,7 +290,8 @@ export async function DELETE(request: Request) {
     if (nextStores.length === stores.length) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    await writeStores(nextStores);
+    if (getSupabase()) await deleteStoreById(id);
+    else await writeStoresToFile(nextStores);
     return NextResponse.json({ deleted: 1 });
   } catch (e) {
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
@@ -254,8 +323,11 @@ export async function PATCH(request: Request) {
         (nextStore as Record<string, unknown>)[key] = typeof updates[key] === "string" ? updates[key].trim() : updates[key];
       }
     }
-    stores[index] = nextStore;
-    await writeStores(stores);
+    if (getSupabase()) await updateStore(id, nextStore);
+    else {
+      stores[index] = nextStore;
+      await writeStoresToFile(stores);
+    }
     return NextResponse.json(nextStore);
   } catch (e) {
     return NextResponse.json({ error: "Failed to update" }, { status: 500 });
