@@ -266,7 +266,9 @@ export default function StorePageClient({
                   ? new Date(c.createdAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
                   : "01/01/2025";
                 const usedCount = 900 + (index % 200);
-                const partialReveal = isCode && c.couponCode ? String(c.couponCode).slice(-2) : String(percent);
+                const partialReveal = c.couponCode && String(c.couponCode).trim().length >= 2
+                  ? String(c.couponCode).trim().slice(-2)
+                  : String(percent);
                 return (
                   <li
                     key={c.id}
