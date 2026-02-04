@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import PromotionsHeader from "@/components/PromotionsHeader";
 import Pagination from "@/components/Pagination";
-import { getStores, slugify } from "@/lib/stores";
+import { getStores, slugify, canonicalSlug, hasCouponData } from "@/lib/stores";
 import { getBlogData } from "@/lib/blog";
 import { stripHtml } from "@/lib/slugify";
 
@@ -30,9 +30,27 @@ export default async function PromotionsPage({
 }) {
   const { page: pageStr } = await searchParams;
   const currentPage = Math.max(1, parseInt(String(pageStr || "1"), 10) || 1);
-  const stores = await getStores();
-  const totalPages = Math.max(1, Math.ceil(stores.length / PER_PAGE));
-  const pageStores = stores.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const allRows = await getStores();
+  const enabled = allRows.filter((s) => s.status !== "disable");
+  // One card per store: use canonical slug so eflorist and eflorist-coupon-code = same store; prefer store row (no coupon data)
+  const storeKeyToRow = new Map<string, (typeof enabled)[0]>();
+  for (const row of enabled) {
+    const rawSlug = (row.slug || slugify(row.name)).toLowerCase().trim() || row.name.toLowerCase().trim();
+    if (!rawSlug) continue;
+    const key = canonicalSlug(rawSlug);
+    const existing = storeKeyToRow.get(key);
+    if (!existing) {
+      storeKeyToRow.set(key, row);
+      continue;
+    }
+    const rowIsCoupon = hasCouponData(row);
+    const existingIsCoupon = hasCouponData(existing);
+    if (rowIsCoupon && !existingIsCoupon) continue;
+    if (!rowIsCoupon && existingIsCoupon) storeKeyToRow.set(key, row);
+  }
+  const uniqueStores = Array.from(storeKeyToRow.values());
+  const totalPages = Math.max(1, Math.ceil(uniqueStores.length / PER_PAGE));
+  const pageStores = uniqueStores.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
   const { featuredPosts } = await getBlogData();
 
   return (
@@ -44,7 +62,7 @@ export default async function PromotionsPage({
           <h1 className="mb-6 text-2xl font-bold uppercase tracking-wide text-zinc-900">
             Featured Coupons And Deals
           </h1>
-          {stores.length === 0 ? (
+          {uniqueStores.length === 0 ? (
             <div className="rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50 py-16 text-center">
               <p className="mb-2 text-zinc-600">
                 No stores yet. Add coupons and deals from the admin panel.
@@ -59,7 +77,7 @@ export default async function PromotionsPage({
           ) : (
             <>
               <p className="mb-4 text-sm text-zinc-500">
-                Showing {(currentPage - 1) * PER_PAGE + 1}–{Math.min(currentPage * PER_PAGE, stores.length)} of {stores.length} stores
+                Showing {(currentPage - 1) * PER_PAGE + 1}–{Math.min(currentPage * PER_PAGE, uniqueStores.length)} of {uniqueStores.length} stores
               </p>
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {pageStores.map((store) => (
@@ -191,13 +209,11 @@ export default async function PromotionsPage({
           <h2 className="mb-4 text-xl font-bold uppercase tracking-wide text-zinc-900">
             Popular Stores & Brands
           </h2>
-          {stores.length === 0 ? (
+          {uniqueStores.length === 0 ? (
             <p className="text-sm text-zinc-500">Stores added from admin will appear here.</p>
           ) : (
             <div className="flex flex-wrap gap-3">
-              {stores
-                .filter((s, i, arr) => arr.findIndex((x) => x.name?.toLowerCase() === s.name?.toLowerCase()) === i)
-                .map((store) => (
+              {uniqueStores.map((store) => (
                   <Link
                     key={store.id}
                     href={`/stores/${store.slug || slugify(store.name)}`}

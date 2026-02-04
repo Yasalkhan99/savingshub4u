@@ -11,9 +11,10 @@ export type Store = {
   slug?: string;
   logoAltText?: string;
   logoMethod?: "url" | "upload";
+  trackingUrl?: string;
+  faqs?: { q: string; a: string }[];
   networkId?: string;
   merchantId?: string;
-  trackingUrl?: string;
   countryCodes?: string;
   websiteUrl?: string;
   category?: string;

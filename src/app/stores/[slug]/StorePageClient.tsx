@@ -67,6 +67,9 @@ export default function StorePageClient({
   const whyTrustUs = storeInfo.whyTrustUs?.trim() || DEFAULT_WHY_TRUST;
   const moreInfo = storeInfo.moreInfo?.trim();
   const displayName = storeInfo.subStoreName || storeInfo.name;
+  const faqsToShow = Array.isArray(storeInfo.faqs) && storeInfo.faqs.length > 0
+    ? storeInfo.faqs.filter((f) => (String(f?.q ?? "").trim() !== "" || String(f?.a ?? "").trim() !== ""))
+    : DEFAULT_FAQS;
 
   const topCodes = coupons.filter((c) => c.couponType === "code").slice(0, 5);
   const newCodes = coupons.slice(0, 5);
@@ -380,7 +383,7 @@ export default function StorePageClient({
               {displayName} coupon and promo codes FAQ
             </h2>
             <div className="space-y-3">
-              {DEFAULT_FAQS.map((faq, i) => (
+              {faqsToShow.map((faq, i) => (
                 <details
                   key={i}
                   className="group rounded-lg border border-zinc-100 bg-zinc-50/50"

@@ -6,6 +6,7 @@ import type { Store } from "@/types/store";
 import type { BlogPost } from "@/data/blog";
 import { categories as blogCategories } from "@/data/blog";
 import { stripHtml, slugify } from "@/lib/slugify";
+import { hasCouponData } from "@/lib/store-utils";
 
 type Section = "dashboard" | "coupons" | "stores" | "blog" | "analytics" | "tracking";
 
@@ -90,8 +91,6 @@ export default function AdminPage() {
     logoUrl: "",
     logoAltText: "",
     description: "",
-    networkId: "",
-    merchantId: "",
     trackingUrl: "",
     countryCodes: "",
     websiteUrl: "",
@@ -101,6 +100,7 @@ export default function AdminPage() {
     seoTitle: "",
     seoMetaDesc: "",
     trending: false,
+    faqs: [] as { q: string; a: string }[],
   });
   const [showStoresCreateForm, setShowStoresCreateForm] = useState(false);
   const [showCouponsCreateForm, setShowCouponsCreateForm] = useState(false);
@@ -119,6 +119,7 @@ export default function AdminPage() {
   const [uploadCouponsFile, setUploadCouponsFile] = useState<File | null>(null);
   const [uploadCouponsPreview, setUploadCouponsPreview] = useState<Record<string, string>[] | null>(null);
   const [uploadCouponsSubmitting, setUploadCouponsSubmitting] = useState(false);
+  const [showAddCouponForStore, setShowAddCouponForStore] = useState(false);
 
   const [blogPosts, setBlogPosts] = useState<(BlogPost & { content?: string; createdAt?: string; publishedDate?: string })[]>([]);
   const [blogLoading, setBlogLoading] = useState(false);
@@ -429,15 +430,17 @@ export default function AdminPage() {
 
   const filteredStores =
     storeFilter === "all" ? stores : stores.filter((s) => s.name === storeFilter);
-  const totalCoupons = stores.length;
-  const activeCoupons = stores.length;
+  const couponRowsOnly = stores.filter(hasCouponData);
+  const totalCoupons = couponRowsOnly.length;
+  const activeCoupons = couponRowsOnly.filter((s) => s.status !== "disable").length;
 
+  const storeRowsOnly = stores.filter((s) => !hasCouponData(s));
   const storesByStatus =
     storeStatusFilter === "all"
-      ? stores
+      ? storeRowsOnly
       : storeStatusFilter === "enable"
-        ? stores.filter((s) => s.status !== "disable")
-        : stores.filter((s) => s.status === "disable");
+        ? storeRowsOnly.filter((s) => s.status !== "disable")
+        : storeRowsOnly.filter((s) => s.status === "disable");
   const storesFilteredBySearch =
     !storeSearch.trim()
       ? storesByStatus
@@ -452,10 +455,10 @@ export default function AdminPage() {
 
   const couponFiltered =
     couponStatusFilter === "all"
-      ? stores
+      ? couponRowsOnly
       : couponStatusFilter === "enable"
-        ? stores.filter((s) => s.status !== "disable")
-        : stores.filter((s) => s.status === "disable");
+        ? couponRowsOnly.filter((s) => s.status !== "disable")
+        : couponRowsOnly.filter((s) => s.status === "disable");
   const couponSearched = !couponSearch.trim()
     ? couponFiltered
     : couponFiltered.filter(
@@ -500,12 +503,22 @@ export default function AdminPage() {
         setMessage({ type: "success", text: "Coupon updated successfully." });
         setEditingCouponId(null);
         setShowCouponsCreateForm(false);
+        setShowAddCouponForStore(false);
       } else {
+        const selectedStore = couponForm.selectedStoreId
+          ? stores.find((s) => s.id === couponForm.selectedStoreId)
+          : null;
+        const slugToUse =
+          selectedStore != null
+            ? (selectedStore.slug ?? slugify(selectedStore.name))
+            : undefined;
+        const nameToUse =
+          selectedStore != null ? selectedStore.name : couponForm.name.trim();
         const res = await fetch("/api/stores", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: couponForm.name.trim(),
+            name: nameToUse,
             description: couponForm.description.trim(),
             expiry: couponForm.expiry.trim() || "Dec 31, 2026",
             link: couponForm.link.trim() || undefined,
@@ -517,6 +530,7 @@ export default function AdminPage() {
             active: couponForm.active,
             imageAlt: couponForm.imageAlt.trim() || undefined,
             status: couponForm.active ? "enable" : "disable",
+            ...(slugToUse != null && slugToUse !== "" && { slug: slugToUse }),
           }),
         });
         if (!res.ok) {
@@ -525,6 +539,7 @@ export default function AdminPage() {
         }
         setMessage({ type: "success", text: "Coupon created successfully." });
         setShowCouponsCreateForm(false);
+        setShowAddCouponForStore(false);
       }
       setCouponForm({
         selectedStoreId: "",
@@ -624,8 +639,6 @@ export default function AdminPage() {
             logoUrl: storeForm.logoUrl.trim() || undefined,
             logoAltText: storeForm.logoAltText.trim() || undefined,
             logoMethod: storeForm.logoMethod,
-            networkId: storeForm.networkId.trim() || undefined,
-            merchantId: storeForm.merchantId.trim() || undefined,
             trackingUrl: storeForm.trackingUrl.trim() || undefined,
             link: storeForm.trackingUrl.trim() || undefined,
             countryCodes: storeForm.countryCodes.trim() || undefined,
@@ -636,6 +649,7 @@ export default function AdminPage() {
             seoTitle: storeForm.seoTitle.trim() || undefined,
             seoMetaDesc: storeForm.seoMetaDesc.trim() || undefined,
             trending: storeForm.trending,
+            faqs: Array.isArray(storeForm.faqs) && storeForm.faqs.length > 0 ? storeForm.faqs.filter((f) => (f.q ?? "").trim() || (f.a ?? "").trim()) : undefined,
             status: "enable",
           }),
         });
@@ -658,8 +672,6 @@ export default function AdminPage() {
             logoUrl: storeForm.logoUrl.trim() || undefined,
             logoAltText: storeForm.logoAltText.trim() || undefined,
             logoMethod: storeForm.logoMethod,
-            networkId: storeForm.networkId.trim() || undefined,
-            merchantId: storeForm.merchantId.trim() || undefined,
             trackingUrl: storeForm.trackingUrl.trim() || undefined,
             link: storeForm.trackingUrl.trim() || undefined,
             countryCodes: storeForm.countryCodes.trim() || undefined,
@@ -670,6 +682,7 @@ export default function AdminPage() {
             seoTitle: storeForm.seoTitle.trim() || undefined,
             seoMetaDesc: storeForm.seoMetaDesc.trim() || undefined,
             trending: storeForm.trending,
+            faqs: Array.isArray(storeForm.faqs) && storeForm.faqs.length > 0 ? storeForm.faqs.filter((f) => (f.q ?? "").trim() || (f.a ?? "").trim()) : undefined,
             status: "enable",
           }),
         });
@@ -688,8 +701,6 @@ export default function AdminPage() {
         logoUrl: "",
         logoAltText: "",
         description: "",
-        networkId: "",
-        merchantId: "",
         trackingUrl: "",
         countryCodes: "",
         websiteUrl: "",
@@ -699,6 +710,7 @@ export default function AdminPage() {
         seoTitle: "",
         seoMetaDesc: "",
         trending: false,
+        faqs: [],
       });
       await fetchStores();
       if (editingStoreId) setShowStoresCreateForm(false);
@@ -905,9 +917,8 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const headers = ["Coupon ID", "Store Name", "Store ID", "Title", "Code", "Description", "Expiry Date", "Status"];
+                      const headers = ["Store Name", "Row ID", "Title", "Code", "Description", "Expiry Date", "Status"];
                       const rows = couponSearched.map((s) => [
-                        s.id,
                         s.name,
                         s.id,
                         s.couponTitle ?? "",
@@ -969,7 +980,7 @@ export default function AdminPage() {
                   </span>
                   <input
                     type="text"
-                    placeholder="Store name or Store ID (e.g. efarma or 190)..."
+                    placeholder="Store name or Row ID (e.g. eFlorist or e425c30f)..."
                     value={couponSearch}
                     onChange={(e) => setCouponSearch(e.target.value)}
                     className="w-full rounded border border-stone-300 py-2 pl-9 pr-3 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
@@ -994,6 +1005,7 @@ export default function AdminPage() {
 
               {!showCouponsCreateForm && (
                 <>
+                  <p className="mb-2 text-xs text-stone-500">Each coupon has its own Row ID; one store can have multiple coupons (same Store Name).</p>
                   <div className="overflow-x-auto rounded-lg border border-stone-300 bg-white shadow-sm">
                     {loading ? (
                       <div className="p-8 text-center text-sm text-stone-500">Loading…</div>
@@ -1006,9 +1018,8 @@ export default function AdminPage() {
                             <th className="w-10 px-3 py-2 text-left font-semibold text-stone-700">
                               <input type="checkbox" className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" aria-label="Select all" />
                             </th>
-                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Coupon ID</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Store Name</th>
-                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Store ID</th>
+                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Row ID</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Title</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Code</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Description</th>
@@ -1023,9 +1034,8 @@ export default function AdminPage() {
                               <td className="w-10 px-3 py-2">
                                 <input type="checkbox" className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500" aria-label={`Select ${row.name}`} />
                               </td>
-                              <td className="px-3 py-2 font-mono text-xs text-stone-600">{row.id.slice(0, 8)}</td>
                               <td className="px-3 py-2 font-medium text-stone-900">{row.name}</td>
-                              <td className="px-3 py-2 font-mono text-xs text-stone-500">{row.id.slice(0, 8)}</td>
+                              <td className="px-3 py-2 font-mono text-xs text-stone-500" title={row.id}>{row.id.slice(0, 8)}</td>
                               <td className="px-3 py-2 text-stone-700">{row.couponTitle ?? "—"}</td>
                               <td className="px-3 py-2 font-medium text-stone-700">{row.couponCode ?? "N/A"}</td>
                               <td className="max-w-[180px] truncate px-3 py-2 text-stone-600" title={row.description ?? ""}>{row.description?.trim() || "—"}</td>
@@ -1454,14 +1464,12 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const headers = ["Store Name", "Description", "Logo URL", "Slug", "Merchant ID", "Network ID", "Tracking URL", "Country Codes", "Website URL", "Category"];
+                      const headers = ["Store Name", "Description", "Logo URL", "Slug", "Tracking URL", "Country Codes", "Website URL", "Category"];
                       const rows = storesFilteredBySearch.map((s) => [
                         s.name,
                         s.description ?? "",
                         s.logoUrl ?? "",
                         s.slug ?? "",
-                        s.merchantId ?? "",
-                        s.networkId ?? "",
                         s.trackingUrl ?? "",
                         s.countryCodes ?? "",
                         s.websiteUrl ?? "",
@@ -1496,7 +1504,7 @@ export default function AdminPage() {
                   {showStoresCreateForm ? (
                     <button
                       type="button"
-                      onClick={() => { setShowStoresCreateForm(false); setEditingStoreId(null); setMessage(null); }}
+                      onClick={() => { setShowStoresCreateForm(false); setEditingStoreId(null); setShowAddCouponForStore(false); setMessage(null); }}
                       className="rounded border border-stone-300 bg-stone-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-stone-700"
                     >
                       Cancel
@@ -1577,11 +1585,9 @@ export default function AdminPage() {
                         <thead>
                           <tr className="border-b border-stone-200 bg-stone-50">
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Store ID</th>
-                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Merchant ID</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Logo</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Store Name</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Slug</th>
-                            <th className="px-3 py-2 text-left font-semibold text-stone-700">Network ID</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Country</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Category</th>
                             <th className="px-3 py-2 text-left font-semibold text-stone-700">Tracking Link</th>
@@ -1593,7 +1599,6 @@ export default function AdminPage() {
                           {storePaginated.map((s) => (
                             <tr key={s.id} className="border-b border-stone-100 hover:bg-stone-50/50">
                               <td className="px-3 py-2 font-mono text-xs text-stone-600">{s.id.slice(0, 8)}</td>
-                              <td className="px-3 py-2 font-mono text-xs text-stone-600">{s.merchantId ?? "—"}</td>
                               <td className="px-3 py-2">
                                 {s.logoUrl ? (
                                   <img src={s.logoUrl} alt={s.logoAltText ?? s.name} className="h-8 w-8 rounded object-contain" />
@@ -1603,7 +1608,6 @@ export default function AdminPage() {
                               </td>
                               <td className="px-3 py-2 font-medium text-stone-900">{s.name}</td>
                               <td className="px-3 py-2 text-stone-600">{s.slug ?? "—"}</td>
-                              <td className="px-3 py-2 text-stone-600">{s.networkId ?? "—"}</td>
                               <td className="px-3 py-2 text-stone-600">{s.countryCodes ?? "—"}</td>
                               <td className="px-3 py-2 text-stone-600">{s.category ?? "—"}</td>
                               <td className="max-w-[140px] truncate px-3 py-2 text-stone-600" title={s.trackingUrl ?? ""}>
@@ -1617,6 +1621,7 @@ export default function AdminPage() {
                                   type="button"
                                   onClick={() => {
                                     setEditingStoreId(s.id);
+                                    setShowAddCouponForStore(false);
                                     setStoreForm({
                                       name: s.name,
                                       subStoreName: s.subStoreName ?? "",
@@ -1626,8 +1631,6 @@ export default function AdminPage() {
                                       logoUrl: s.logoUrl ?? "",
                                       logoAltText: s.logoAltText ?? "",
                                       description: s.description ?? "",
-                                      networkId: s.networkId ?? "",
-                                      merchantId: s.merchantId ?? "",
                                       trackingUrl: s.trackingUrl ?? "",
                                       countryCodes: s.countryCodes ?? "",
                                       websiteUrl: s.websiteUrl ?? "",
@@ -1637,6 +1640,7 @@ export default function AdminPage() {
                                       seoTitle: s.seoTitle ?? "",
                                       seoMetaDesc: s.seoMetaDesc ?? "",
                                       trending: s.trending ?? false,
+                                      faqs: Array.isArray(s.faqs) && s.faqs.length > 0 ? s.faqs : [],
                                     });
                                     setShowStoresCreateForm(true);
                                   }}
@@ -1714,9 +1718,6 @@ export default function AdminPage() {
                 <>
               <div className="mb-4">
                 <h2 className="font-serif text-lg font-semibold text-stone-900">{editingStoreId ? "Edit Store" : "Create New Store"}</h2>
-                {(storeForm.merchantId ?? "").trim() && (
-                  <p className="mt-1 text-sm font-medium text-stone-600">Merchant ID: {storeForm.merchantId}</p>
-                )}
               </div>
 
               {message && section === "stores" && (
@@ -1905,28 +1906,6 @@ export default function AdminPage() {
                       Technical &amp; Affiliate Information
                     </h3>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-stone-700">Network ID (Region)</label>
-                      <input
-                        type="text"
-                        value={storeForm.networkId ?? ""}
-                        onChange={(e) => setStoreForm((f) => ({ ...f, networkId: e.target.value }))}
-                        placeholder="Enter numeric Network ID (e.g., 1, 2, 100)"
-                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
-                      />
-                      <p className="mt-1 text-xs text-stone-500"><button type="button" className="text-sky-600 hover:underline">Manage regions</button></p>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-stone-700">Merchant ID</label>
-                      <input
-                        type="text"
-                        value={storeForm.merchantId ?? ""}
-                        onChange={(e) => setStoreForm((f) => ({ ...f, merchantId: e.target.value }))}
-                        placeholder="Enter Merchant ID"
-                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
-                      />
-                      <p className="mt-1 text-xs text-stone-500">Enter the Merchant ID for this store (e.g., from affiliate network).</p>
-                    </div>
-                    <div>
                       <label className="mb-1 block text-sm font-medium text-stone-700">Tracking URL</label>
                       <input
                         type="url"
@@ -1962,11 +1941,8 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Full width: Category, Why Trust Us, More Info, SEO, Trending */}
+                {/* Full width: Category, Why Trust Us, More Info, FAQs, SEO, Trending */}
                 <div className="rounded-lg border border-stone-300 bg-white p-5 shadow-sm">
-                  {(storeForm.networkId ?? "").trim() && (
-                    <h2 className="mb-3 text-base font-semibold text-stone-700">Network ID: {storeForm.networkId}</h2>
-                  )}
                   <h3 className="mb-4 border-b border-stone-200 pb-2 text-sm font-semibold uppercase tracking-wide text-stone-600">
                     Category &amp; Content
                   </h3>
@@ -2005,6 +1981,48 @@ export default function AdminPage() {
                       className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                     />
                     <p className="mt-1 text-xs text-stone-500">Supports HTML formatting. Leave blank to use default content.</p>
+                  </div>
+                  <div className="mt-4">
+                    <label className="mb-2 block text-sm font-medium text-stone-700">FAQs (shown on store page)</label>
+                    <p className="mb-3 text-xs text-stone-500">Add question/answer pairs. These will appear in the FAQ section on the store page. Leave empty to use default FAQs.</p>
+                    {(storeForm.faqs ?? []).map((faq, i) => (
+                      <div key={i} className="mb-3 flex flex-col gap-2 rounded border border-stone-200 bg-stone-50 p-3">
+                        <input
+                          type="text"
+                          value={faq.q ?? ""}
+                          onChange={(e) => setStoreForm((f) => ({
+                            ...f,
+                            faqs: (f.faqs ?? []).map((item, j) => j === i ? { ...item, q: e.target.value } : item),
+                          }))}
+                          placeholder="Question"
+                          className="rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                        />
+                        <textarea
+                          value={faq.a ?? ""}
+                          onChange={(e) => setStoreForm((f) => ({
+                            ...f,
+                            faqs: (f.faqs ?? []).map((item, j) => j === i ? { ...item, a: e.target.value } : item),
+                          }))}
+                          placeholder="Answer"
+                          rows={2}
+                          className="rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setStoreForm((f) => ({ ...f, faqs: (f.faqs ?? []).filter((_, j) => j !== i) }))}
+                          className="self-start text-xs text-red-600 hover:underline"
+                        >
+                          Remove FAQ
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setStoreForm((f) => ({ ...f, faqs: [...(f.faqs ?? []), { q: "", a: "" }] }))}
+                      className="rounded border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                    >
+                      Add FAQ
+                    </button>
                   </div>
                 </div>
 
@@ -2056,6 +2074,114 @@ export default function AdminPage() {
                   {submitting ? (editingStoreId ? "Updating…" : "Creating Store…") : (editingStoreId ? "Update Store" : "Create Store")}
                 </button>
               </form>
+
+              {/* Coupons for this store — create coupon inside Stores page */}
+              {editingStoreId && (
+                <div className="mt-8 rounded-lg border border-stone-300 bg-stone-50 p-6 shadow-sm">
+                  <h3 className="mb-3 font-serif text-base font-semibold text-stone-900">Coupons for this store</h3>
+                  {(() => {
+                    const storeKeyForm = (storeForm.slug || slugify(storeForm.name ?? "")).toLowerCase().trim() || (storeForm.name ?? "").toLowerCase().trim();
+                    const hasCouponData = (row: Store) => (String(row.couponCode ?? "").trim() !== "" || String(row.couponTitle ?? "").trim() !== "");
+                    const couponsForThisStore = stores.filter((row) => {
+                      const key = (row.slug || slugify(row.name)).toLowerCase().trim() || row.name.toLowerCase().trim();
+                      return key === storeKeyForm && hasCouponData(row);
+                    });
+                    return (
+                      <>
+                        {couponsForThisStore.length > 0 && (
+                          <div className="mb-4 overflow-x-auto rounded border border-stone-200 bg-white">
+                            <table className="w-full border-collapse text-sm">
+                              <thead>
+                                <tr className="border-b border-stone-200 bg-stone-100">
+                                  <th className="px-3 py-2 text-left font-semibold text-stone-700">Title / Code</th>
+                                  <th className="px-3 py-2 text-left font-semibold text-stone-700">Expiry</th>
+                                  <th className="px-3 py-2 text-left font-semibold text-stone-700">Status</th>
+                                  <th className="px-3 py-2 text-left font-semibold text-stone-700">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {couponsForThisStore.map((row) => (
+                                  <tr key={row.id} className="border-b border-stone-100">
+                                    <td className="px-3 py-2 text-stone-700">{row.couponTitle || row.couponCode || "—"}</td>
+                                    <td className="px-3 py-2 text-stone-600">{row.expiry ?? "—"}</td>
+                                    <td className="px-3 py-2 text-stone-600">{row.status ?? "enable"}</td>
+                                    <td className="px-3 py-2">
+                                      <button type="button" onClick={() => { startEditCoupon(row); setSection("coupons"); setShowCouponsCreateForm(true); }} className="rounded border border-sky-600 bg-sky-600 px-2 py-1 text-xs font-medium text-white hover:bg-sky-700">Edit</button>
+                                      <button type="button" onClick={() => handleDeleteCoupon(row.id)} className="ml-1 rounded border border-red-600 bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700">Delete</button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        {!showAddCouponForStore ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddCouponForStore(true);
+                              setCouponForm((f) => ({ ...f, selectedStoreId: editingStoreId, name: storeForm.name ?? "", description: storeForm.description ?? "" }));
+                              setEditingCouponId(null);
+                            }}
+                            className="rounded border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                          >
+                            Add coupon for this store
+                          </button>
+                        ) : (
+                          <div className="rounded-lg border border-stone-300 bg-white p-4 shadow-sm">
+                            <h4 className="mb-3 font-serif text-sm font-semibold text-stone-800">New coupon for: {storeForm.name}</h4>
+                            <form onSubmit={handleCouponSubmit} className="space-y-3">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-stone-600">Coupon Type</label>
+                                  <div className="flex gap-3">
+                                    <label className="flex cursor-pointer items-center gap-2">
+                                      <input type="radio" name="couponTypeStore" checked={couponForm.couponType === "code"} onChange={() => setCouponForm((f) => ({ ...f, couponType: "code" }))} className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500" />
+                                      <span className="text-sm text-stone-700">Code</span>
+                                    </label>
+                                    <label className="flex cursor-pointer items-center gap-2">
+                                      <input type="radio" name="couponTypeStore" checked={couponForm.couponType === "deal"} onChange={() => setCouponForm((f) => ({ ...f, couponType: "deal" }))} className="h-4 w-4 border-stone-300 text-amber-600 focus:ring-amber-500" />
+                                      <span className="text-sm text-stone-700">Deal</span>
+                                    </label>
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-stone-600">Coupon Code {couponForm.couponType === "code" ? "*" : "(Optional)"}</label>
+                                  <input type="text" required={couponForm.couponType === "code"} value={couponForm.couponCode ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, couponCode: e.target.value }))} placeholder="e.g. SAVE20" className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-stone-600">Coupon Title (Optional)</label>
+                                <input type="text" value={couponForm.couponTitle ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, couponTitle: e.target.value }))} placeholder="e.g. 20% Off" className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-stone-600">Description *</label>
+                                <textarea required value={couponForm.description ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, description: e.target.value }))} placeholder="Coupon or deal description" rows={2} className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-stone-600">Coupon URL (optional)</label>
+                                <input type="url" value={couponForm.link ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, link: e.target.value }))} placeholder="https://..." className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-stone-600">Expiry (optional)</label>
+                                <input type="text" value={couponForm.expiry ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, expiry: e.target.value }))} placeholder="Dec 31, 2026" className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
+                              </div>
+                              <div className="flex flex-wrap items-center gap-3">
+                                <button type="submit" disabled={submitting} className="rounded border-2 border-sky-600 bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">
+                                  {submitting ? "Creating…" : "Create Coupon"}
+                                </button>
+                                <button type="button" onClick={() => { setShowAddCouponForStore(false); setCouponForm((f) => ({ ...f, couponCode: "", couponTitle: "", description: storeForm.description ?? "" })); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
                 </>
               )}
 
@@ -2064,7 +2190,7 @@ export default function AdminPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4" onClick={() => !uploadStoresSubmitting && setShowUploadStoresModal(false)}>
                   <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-stone-300 bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
                     <h3 className="mb-4 font-serif text-xl font-bold text-stone-900">Upload Stores (CSV)</h3>
-                    <p className="mb-4 text-sm text-stone-600">Upload a CSV. Use headers: <strong>name</strong>, <strong>description</strong>, <strong>logoUrl</strong>, <strong>slug</strong>, <strong>merchantId</strong>, <strong>networkId</strong>, <strong>trackingUrl</strong>, <strong>countryCodes</strong>, <strong>websiteUrl</strong>, <strong>category</strong> (or &quot;Store Name&quot; for name). First row = headers.</p>
+                    <p className="mb-4 text-sm text-stone-600">Upload a CSV. Use headers: <strong>name</strong>, <strong>description</strong>, <strong>logoUrl</strong>, <strong>slug</strong>, <strong>trackingUrl</strong>, <strong>countryCodes</strong>, <strong>websiteUrl</strong>, <strong>category</strong> (or &quot;Store Name&quot; for name). First row = headers.</p>
                     <div className="mb-4">
                       <label className="mb-2 block text-sm font-medium text-stone-700">Choose CSV file</label>
                       <input

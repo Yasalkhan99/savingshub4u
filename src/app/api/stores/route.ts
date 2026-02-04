@@ -100,8 +100,6 @@ function buildStoreFromBody(body: Record<string, unknown>, slugFromName: string)
     slug,
     logoAltText,
     logoMethod,
-    networkId,
-    merchantId,
     trackingUrl,
     countryCodes,
     websiteUrl,
@@ -112,6 +110,7 @@ function buildStoreFromBody(body: Record<string, unknown>, slugFromName: string)
     seoMetaDesc,
     trending,
     status,
+    faqs,
   } = body;
   return {
     id: crypto.randomUUID(),
@@ -125,8 +124,6 @@ function buildStoreFromBody(body: Record<string, unknown>, slugFromName: string)
     ...(slug != null && String(slug).trim() !== "" ? { slug: String(slug).trim() } : { slug: slugFromName }),
     ...(logoAltText != null && String(logoAltText).trim() !== "" && { logoAltText: String(logoAltText).trim() }),
     ...(logoMethod != null && { logoMethod: logoMethod === "upload" ? "upload" : "url" }),
-    ...(networkId != null && String(networkId).trim() !== "" && { networkId: String(networkId).trim() }),
-    ...(merchantId != null && String(merchantId).trim() !== "" && { merchantId: String(merchantId).trim() }),
     ...(trackingUrl != null && String(trackingUrl).trim() !== "" && { trackingUrl: String(trackingUrl).trim() }),
     ...(countryCodes != null && String(countryCodes).trim() !== "" && { countryCodes: String(countryCodes).trim() }),
     ...(websiteUrl != null && String(websiteUrl).trim() !== "" && { websiteUrl: String(websiteUrl).trim() }),
@@ -138,6 +135,7 @@ function buildStoreFromBody(body: Record<string, unknown>, slugFromName: string)
     ...(trending === true && { trending: true }),
     ...(status === "disable" && { status: "disable" }),
     ...(status === "enable" && { status: "enable" }),
+    ...(Array.isArray(faqs) && faqs.length > 0 && { faqs: faqs.filter((f: { q?: string; a?: string }) => (String(f?.q ?? "").trim() !== "" || String(f?.a ?? "").trim() !== "")) }),
   };
 }
 
@@ -195,8 +193,6 @@ export async function POST(request: Request) {
       slug,
       logoAltText,
       logoMethod,
-      networkId,
-      merchantId,
       trackingUrl,
       countryCodes,
       websiteUrl,
@@ -207,6 +203,7 @@ export async function POST(request: Request) {
       seoMetaDesc,
       trending,
       status,
+      faqs,
       couponType,
       couponCode,
       couponTitle,
@@ -246,8 +243,6 @@ export async function POST(request: Request) {
         slug,
         logoAltText,
         logoMethod,
-        networkId,
-        merchantId,
         trackingUrl,
         countryCodes,
         websiteUrl,
@@ -258,6 +253,7 @@ export async function POST(request: Request) {
         seoMetaDesc,
         trending,
         status,
+        faqs,
       },
       slugFromName
     );
@@ -326,14 +322,14 @@ export async function PATCH(request: Request) {
     const current = stores[index];
     const allowed = [
       "name", "logoUrl", "description", "expiry", "link", "subStoreName", "slug",
-      "logoAltText", "logoMethod", "networkId", "merchantId", "trackingUrl", "countryCodes",
+      "logoAltText", "logoMethod", "trackingUrl", "countryCodes",
       "websiteUrl", "category", "whyTrustUs", "moreInfo", "seoTitle", "seoMetaDesc",
-      "trending", "status", "couponType", "couponCode", "couponTitle", "priority", "active", "imageAlt",
+      "trending", "status", "faqs", "couponType", "couponCode", "couponTitle", "priority", "active", "imageAlt",
     ];
     const nextStore = { ...current };
     for (const key of allowed) {
       if (key in updates && updates[key] !== undefined) {
-        (nextStore as Record<string, unknown>)[key] = typeof updates[key] === "string" ? updates[key].trim() : updates[key];
+        (nextStore as Record<string, unknown>)[key] = key === "faqs" ? updates[key] : (typeof updates[key] === "string" ? updates[key].trim() : updates[key]);
       }
     }
     if (getSupabase()) await updateStore(id, nextStore);
