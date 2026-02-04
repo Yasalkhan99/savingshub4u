@@ -11,7 +11,7 @@ Blog-based homepage for a coupon & savings website. Built with Next.js 16, TypeS
 - **Blog post pages** – `/blog/[slug]` for individual articles
 
 ## Run locally.
-
+xx
 ```bash
 npm install
 npm run dev
