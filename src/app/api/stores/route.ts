@@ -276,7 +276,11 @@ export async function POST(request: Request) {
     }
     return NextResponse.json(newStore);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    let message = e instanceof Error ? e.message : String(e);
+    if (/invalid|api key|jwt|unauthorized/i.test(message)) {
+      message =
+        "Invalid Supabase API key on live site. In Vercel → Project → Settings → Environment Variables, set SUPABASE_SERVICE_ROLE_KEY to the service_role secret (not anon key) from Supabase Dashboard → Project Settings → API, same project as NEXT_PUBLIC_SUPABASE_URL. Then redeploy.";
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
