@@ -99,6 +99,7 @@ function buildStoreFromBody(body: Record<string, unknown>, slugFromName: string)
     expiry,
     link,
     subStoreName,
+    storePageHeading,
     slug,
     logoAltText,
     logoMethod,
@@ -123,6 +124,7 @@ function buildStoreFromBody(body: Record<string, unknown>, slugFromName: string)
     link: link ? String(link).trim() : undefined,
     createdAt: new Date().toISOString(),
     ...(subStoreName != null && String(subStoreName).trim() !== "" && { subStoreName: String(subStoreName).trim() }),
+    ...(storePageHeading != null && String(storePageHeading).trim() !== "" && { storePageHeading: String(storePageHeading).trim() }),
     ...(slug != null && String(slug).trim() !== "" ? { slug: String(slug).trim() } : { slug: slugFromName }),
     ...(logoAltText != null && String(logoAltText).trim() !== "" && { logoAltText: String(logoAltText).trim() }),
     ...(logoMethod != null && { logoMethod: logoMethod === "upload" ? "upload" : "url" }),
@@ -192,6 +194,7 @@ export async function POST(request: Request) {
       expiry,
       link,
       subStoreName,
+      storePageHeading,
       slug,
       logoAltText,
       logoMethod,
@@ -242,6 +245,7 @@ export async function POST(request: Request) {
         expiry,
         link,
         subStoreName,
+        storePageHeading,
         slug,
         logoAltText,
         logoMethod,
@@ -360,7 +364,7 @@ export async function PATCH(request: Request) {
     }
     const current = stores[index];
     const allowed = [
-      "name", "logoUrl", "description", "expiry", "link", "subStoreName", "slug",
+      "name", "logoUrl", "description", "expiry", "link", "subStoreName", "storePageHeading", "slug",
       "logoAltText", "logoMethod", "trackingUrl", "countryCodes",
       "websiteUrl", "category", "whyTrustUs", "moreInfo", "seoTitle", "seoMetaDesc",
       "trending", "status", "faqs", "couponType", "couponCode", "couponTitle", "priority", "active", "imageAlt",

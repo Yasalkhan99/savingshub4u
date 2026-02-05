@@ -210,7 +210,7 @@ export default function StorePageClient({
           {/* Store name + Discount Code heading, grid/list + sort */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-bold text-zinc-900 sm:text-2xl">
-              {displayName} Discount Code
+              {(storeInfo.storePageHeading ?? "").trim() || `${displayName} Discount Code`}
             </h2>
             <div className="flex items-center gap-2">
               <div className="flex rounded border border-zinc-200 bg-white overflow-hidden">

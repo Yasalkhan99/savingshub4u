@@ -87,6 +87,7 @@ export default function AdminPage() {
   const [storeForm, setStoreForm] = useState({
     name: "",
     subStoreName: "",
+    storePageHeading: "",
     slug: "",
     slugAuto: true,
     logoMethod: "url" as "url" | "upload",
@@ -650,6 +651,7 @@ export default function AdminPage() {
             name: storeForm.name.trim(),
             description: storeForm.description.trim() || storeForm.name.trim(),
             subStoreName: storeForm.subStoreName.trim() || undefined,
+            storePageHeading: storeForm.storePageHeading.trim() || undefined,
             slug: slug || undefined,
             logoUrl: storeForm.logoUrl.trim() || undefined,
             logoAltText: storeForm.logoAltText.trim() || undefined,
@@ -683,6 +685,7 @@ export default function AdminPage() {
             description: storeForm.description.trim() || storeForm.name.trim(),
             expiry: "Dec 31, 2026",
             subStoreName: storeForm.subStoreName.trim() || undefined,
+            storePageHeading: storeForm.storePageHeading.trim() || undefined,
             slug: slug || undefined,
             logoUrl: storeForm.logoUrl.trim() || undefined,
             logoAltText: storeForm.logoAltText.trim() || undefined,
@@ -710,6 +713,7 @@ export default function AdminPage() {
       setStoreForm({
         name: "",
         subStoreName: "",
+        storePageHeading: "",
         slug: "",
         slugAuto: true,
         logoMethod: "url",
@@ -1671,6 +1675,7 @@ export default function AdminPage() {
                                     setStoreForm({
                                       name: s.name,
                                       subStoreName: s.subStoreName ?? "",
+                                      storePageHeading: s.storePageHeading ?? "",
                                       slug: s.slug ?? "",
                                       slugAuto: !s.slug,
                                       logoMethod: s.logoMethod ?? "url",
@@ -1831,6 +1836,17 @@ export default function AdminPage() {
                         className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                       />
                       <p className="mt-1 text-xs text-stone-500">This name will be displayed on the store page when visiting the store.</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Store Page Heading (above coupons)</label>
+                      <input
+                        type="text"
+                        value={storeForm.storePageHeading ?? ""}
+                        onChange={(e) => setStoreForm((f) => ({ ...f, storePageHeading: e.target.value }))}
+                        placeholder="e.g., Valvoline Synthetic Oil Change Discount Code"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                      <p className="mt-1 text-xs text-stone-500">Main heading on the store page, above the coupon list. If blank, &quot;Sub Store Name + Discount Code&quot; is used.</p>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-stone-700">Slug (URL-friendly name)</label>

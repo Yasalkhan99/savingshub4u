@@ -8,6 +8,8 @@ export type Store = {
   createdAt?: string;
   // Extended store fields (Manage Stores form)
   subStoreName?: string;
+  /** Main heading on store page (e.g. "Valvoline Synthetic Oil Change Discount Code"). If set, used above coupons; else displayName + " Discount Code". */
+  storePageHeading?: string;
   slug?: string;
   logoAltText?: string;
   logoMethod?: "url" | "upload";
