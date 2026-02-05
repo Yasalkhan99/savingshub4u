@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import PromotionsHeader from "@/components/PromotionsHeader";
 import { getStorePageData } from "@/lib/stores";
 import type { Store } from "@/types/store";
@@ -18,57 +17,34 @@ export default async function StorePage({ params }: Props) {
   const visitUrl = storeInfo.trackingUrl || storeInfo.link || storeInfo.websiteUrl || "#";
   const displayName = storeInfo.subStoreName || storeInfo.name;
 
+  const siteName = "SavingsHub4u";
+
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       <PromotionsHeader />
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Breadcrumbs */}
-        <nav className="mb-6 text-sm text-zinc-500" aria-label="Breadcrumb">
-          <ol className="flex flex-wrap items-center gap-1">
-            <li>
-              <Link href="/" className="hover:text-zinc-700">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden>›</li>
-            <li>
-              <Link href="/promotions" className="hover:text-zinc-700">
-                Stores
-              </Link>
-            </li>
-            <li aria-hidden>›</li>
-            <li className="text-zinc-900 font-medium">{displayName} Coupon Code</li>
-          </ol>
-        </nav>
-
-        {/* Hero: circular logo + title */}
-        <div className="mb-8 flex flex-wrap items-center gap-6">
-          <div className="flex h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-zinc-200 bg-zinc-50">
-            {storeInfo.logoUrl ? (
-              <Image
-                src={storeInfo.logoUrl}
-                alt={storeInfo.logoAltText || storeInfo.name}
-                width={80}
-                height={80}
-                className="h-full w-full object-contain"
-                unoptimized
-              />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-teal-600">
-                {storeInfo.name.charAt(0)}
-              </span>
-            )}
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">
-              {displayName} Coupon Code
-            </h1>
-            <p className="mt-1 text-sm text-zinc-500">
-              {coupons.length} Coupon{coupons.length !== 1 ? "s" : ""} · Verified &amp; hand-tested
-            </p>
-          </div>
+      {/* Breadcrumb strip - light peach/orange, centered Store title, current in blue */}
+      <div className="border-b border-amber-200/60 bg-[#fff8f0]">
+        <div className="mx-auto max-w-7xl px-4 py-6 text-center sm:px-6 lg:px-8">
+          <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">Store: {displayName}</h1>
+          <nav className="mt-2 text-sm text-zinc-600" aria-label="Breadcrumb">
+            <ol className="flex flex-wrap items-center justify-center gap-1">
+              <li>
+                <Link href="/" className="hover:text-zinc-900">{siteName}</Link>
+              </li>
+              <li aria-hidden>›</li>
+              <li>
+                <Link href="/promotions" className="hover:text-zinc-900">Coupon</Link>
+              </li>
+              <li aria-hidden>›</li>
+              <li>
+                <span className="font-medium text-blue-600">{displayName}</span>
+              </li>
+            </ol>
+          </nav>
         </div>
+      </div>
 
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <StorePageClient
           storeInfo={storeInfo}
           coupons={coupons}
@@ -79,8 +55,34 @@ export default async function StorePage({ params }: Props) {
         />
       </main>
 
-      {/* Footer - peach/sand style */}
-      <footer className="mt-16 border-t border-zinc-200 bg-amber-50/80 text-zinc-900">
+      {/* Newsletter - blue banner with left/right SVGs */}
+      <section className="relative bg-blue-600 py-10">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-12 opacity-30 sm:px-20">
+          <img src="/Group%201171275124.svg" alt="" className="h-24 w-24 shrink-0 object-contain sm:h-32 sm:w-32" />
+          <img src="/Group%201171275125.svg" alt="" className="h-24 w-24 shrink-0 object-contain sm:h-32 sm:w-32" />
+        </div>
+        <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-xl font-bold text-white sm:text-2xl">Join our newsletter for updates!</h2>
+          <p className="mt-2 text-sm text-blue-100">Join our community with more than 300K active users</p>
+          <div className="mt-6 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+            <input
+              type="email"
+              placeholder="Email Address"
+              className="w-full max-w-xs rounded-lg border-0 px-4 py-3 text-zinc-900 shadow-sm focus:ring-2 focus:ring-amber-400 sm:max-w-sm"
+            />
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-3 font-semibold text-white transition hover:bg-amber-600"
+            >
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+              Subscribe
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer - no top margin so no white gap below blue newsletter */}
+      <footer className="border-t border-blue-600 bg-amber-50/80 text-zinc-900">
         <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -141,20 +143,13 @@ export default async function StorePage({ params }: Props) {
             </div>
           </div>
         </div>
-        <div className="border-t border-amber-200/60 bg-amber-100/50 px-4 py-4">
-          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row sm:px-6 lg:px-8">
-            <Link href="/" className="flex items-center gap-2 text-lg font-bold text-zinc-900">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 text-teal-600">
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-              </span>
-              SavingsHub4u
-            </Link>
-            <p className="text-sm text-zinc-600">© {new Date().getFullYear()} SavingsHub4u. All Rights Reserved.</p>
-            <div className="flex items-center gap-3">
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-zinc-900" aria-label="Facebook">FB</a>
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-zinc-900" aria-label="Twitter">TW</a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-zinc-900" aria-label="Instagram">IG</a>
-              <a href="https://pinterest.com" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-zinc-900" aria-label="Pinterest">Pin</a>
+        <div className="border-t border-zinc-200 bg-zinc-100 px-4 py-4">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row sm:px-6 lg:px-8">
+            <p className="text-sm text-zinc-600">Copyright © {new Date().getFullYear()} SavingsHub4u. All rights reserved.</p>
+            <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-zinc-600">
+              <Link href="/contact" className="hover:text-zinc-900">Help &amp; Supports</Link>
+              <Link href="/privacy" className="hover:text-zinc-900">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-zinc-900">Terms &amp; Conditions</Link>
             </div>
           </div>
         </div>

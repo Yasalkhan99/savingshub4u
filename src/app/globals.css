@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+/* Theme (Couponly-style from theme.html) – apna data SavingsHub4u ke saath */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --theme-primary: #2563eb;
+  --theme-primary-hover: #1d4ed8;
+  --theme-accent: #f59e0b;
+  --theme-accent-hover: #d97706;
+  --theme-breadcrumb-bg: #fffbeb;
+  --theme-border: #e5e7eb;
 }
 
 @theme inline {

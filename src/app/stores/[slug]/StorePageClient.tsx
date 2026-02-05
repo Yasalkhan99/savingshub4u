@@ -48,6 +48,8 @@ export default function StorePageClient({
   visitUrl,
 }: Props) {
   const [filter, setFilter] = useState<"all" | "code" | "deal">("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sortBy, setSortBy] = useState<"ending" | "newest" | "used">("ending");
   const [revealingCoupon, setRevealingCoupon] = useState<{
     code: string;
     title: string;
@@ -73,6 +75,10 @@ export default function StorePageClient({
 
   const topCodes = coupons.filter((c) => c.couponType === "code").slice(0, 5);
   const newCodes = coupons.slice(0, 5);
+  const bestPercent = coupons.length > 0
+    ? Math.max(...coupons.map((c) => getPercentFromTitle(c.couponTitle || c.couponCode || "", 10)), 10)
+    : 25;
+  const locationLabel = storeInfo.countryCodes?.trim() || "Worldwide";
 
   const categoryLinks = [
     { label: `${displayName} Free Shipping Coupons`, href: "#" },
@@ -90,94 +96,76 @@ export default function StorePageClient({
         />
       )}
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
-        {/* Left Sidebar */}
+        {/* Left Sidebar - Couponly style */}
         <aside className="order-1 shrink-0 lg:w-72">
           <div className="sticky top-4 space-y-6">
-            {/* About [Store] Coupon Code */}
+            {/* Store card: blue circle, Up To X% OFF, GO TO SHOP, location */}
             <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">
-                About {displayName} Coupon Code
-              </h2>
-              <p className="mb-4 text-sm leading-relaxed text-zinc-600">
-                {storeInfo.description || `Save with verified ${displayName} coupon codes and deals. We hand-test every offer so you can shop with confidence.`}
-              </p>
-              <dl className="grid grid-cols-1 gap-2 text-sm">
-                <div className="flex justify-between border-b border-zinc-100 pb-2">
-                  <dt className="text-zinc-500">Total Coupons</dt>
-                  <dd className="font-semibold text-zinc-900">{coupons.length}</dd>
+              <div className="flex flex-col items-center text-center">
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-600 text-white">
+                  {storeInfo.logoUrl ? (
+                    <div className="relative h-full w-full">
+                      <Image src={storeInfo.logoUrl} alt={storeInfo.logoAltText || storeInfo.name} fill className="object-contain p-2" sizes="96px" unoptimized />
+                    </div>
+                  ) : (
+                    <span className="text-2xl font-bold">{displayName.slice(0, 4).toUpperCase()}</span>
+                  )}
                 </div>
-                <div className="flex justify-between border-b border-zinc-100 pb-2">
-                  <dt className="text-zinc-500">Active Codes</dt>
-                  <dd className="font-semibold text-zinc-900">{codesCount}</dd>
-                </div>
-                <div className="flex justify-between pb-2">
-                  <dt className="text-zinc-500">Active Deals</dt>
-                  <dd className="font-semibold text-zinc-900">{dealsCount}</dd>
-                </div>
-              </dl>
-              <h3 className="mb-2 mt-4 text-xs font-bold uppercase tracking-wide text-zinc-600">
-                Popular {displayName} Coupon Categories
-              </h3>
-              <ul className="space-y-1.5 text-sm">
-                {categoryLinks.map((item, i) => (
-                  <li key={i}>
-                    <Link href={item.href} className="text-teal-600 hover:underline">
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                <p className="mt-3 text-sm font-bold text-zinc-900">Up To {bestPercent}% OFF</p>
+                <a
+                  href={visitUrl.startsWith("http") ? visitUrl : `https://${visitUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  GO TO SHOP
+                </a>
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  {locationLabel}
+                </p>
+              </div>
             </div>
 
-            {/* Top [Store] Coupon Codes */}
-            {topCodes.length > 0 && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">
-                  Top {displayName} Coupon Codes
-                </h2>
-                <ul className="space-y-2 text-sm text-zinc-700">
-                  {topCodes.map((c) => (
-                    <li key={c.id} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />
-                      <span>{c.couponTitle || (c.couponCode ? `Use code ${c.couponCode}` : "Deal")}</span>
-                    </li>
-                  ))}
-                </ul>
+            {/* Deals or coupon - tabs */}
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">Deals or coupon</h2>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setFilter("code")}
+                  className={`rounded px-3 py-2 text-xs font-semibold uppercase transition ${filter === "code" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                >
+                  Online Codes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter("all")}
+                  className={`rounded px-3 py-2 text-xs font-semibold uppercase transition ${filter === "all" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                >
+                  Store Codes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter("deal")}
+                  className={`rounded px-3 py-2 text-xs font-semibold uppercase transition ${filter === "deal" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+                >
+                  Online Sales
+                </button>
               </div>
-            )}
+            </div>
 
-            {/* New [Store] Coupon Codes */}
-            {newCodes.length > 0 && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">
-                  New {displayName} Coupon Codes
-                </h2>
-                <ul className="space-y-2 text-sm text-zinc-700">
-                  {newCodes.map((c) => (
-                    <li key={c.id} className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />
-                      <span>{c.couponTitle || (c.couponCode ? `Use code ${c.couponCode}` : "Deal")}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Visit Store */}
-            <a
-              href={visitUrl.startsWith("http") ? visitUrl : `https://${visitUrl}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full rounded-xl bg-teal-600 px-4 py-3 text-center font-semibold text-white shadow-sm transition hover:bg-teal-700"
-            >
-              Visit Store
-            </a>
+            {/* About Store */}
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">About Store</h2>
+              <p className="text-sm leading-relaxed text-zinc-600">
+                {storeInfo.description || `${displayName} offers verified coupon codes and deals. Save with hand-tested offers.`}
+              </p>
+            </div>
 
             {otherStores.length > 0 && (
               <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-600">
-                  Related Stores
-                </h3>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-600">Related Stores</h3>
                 <div className="grid grid-cols-3 gap-2">
                   {otherStores.slice(0, 9).map((s) => (
                     <Link
@@ -201,36 +189,50 @@ export default function StorePageClient({
           </div>
         </aside>
 
-        {/* Main Content */}
+        {/* Main Content - Right column */}
         <div className="order-2 min-w-0 flex-1">
-          {/* Tabs: All | Coupons | Deals */}
-          <div className="mb-6 flex gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1">
-            {(["all", "code", "deal"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`flex-1 rounded-md px-4 py-2.5 text-sm font-medium transition ${
-                  filter === f
-                    ? "bg-blue-600 text-white shadow"
-                    : "text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900"
-                }`}
+          {/* Found X coupon(s) + grid/list + sort */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm font-medium text-zinc-700">
+              Found {filtered.length} coupon{filtered.length !== 1 ? "s" : ""}
+            </span>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded border border-zinc-200 bg-white overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`p-2 ${viewMode === "grid" ? "bg-blue-600 text-white" : "text-zinc-500 hover:bg-zinc-100"}`}
+                  aria-label="Grid view"
+                >
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  className={`p-2 ${viewMode === "list" ? "bg-blue-600 text-white" : "text-zinc-500 hover:bg-zinc-100"}`}
+                  aria-label="List view"
+                >
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                </button>
+              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "ending" | "newest" | "used")}
+                className="rounded border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-                {f === "all" ? "All" : f === "code" ? "Coupons" : "Deals"}
-              </button>
-            ))}
+                <option value="ending">Ending Soon</option>
+                <option value="newest">Newest</option>
+                <option value="used">Most Used</option>
+              </select>
+            </div>
           </div>
-
-          <h2 className="mb-4 text-xl font-bold text-zinc-900">
-            {displayName} Coupon
-          </h2>
 
           {filtered.length === 0 ? (
             <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center text-zinc-500 shadow-sm">
               No offers in this category.
             </div>
           ) : (
-            <ul className="space-y-4">
+            <ul className={viewMode === "grid" ? "grid gap-2 sm:grid-cols-2 sm:gap-3" : "space-y-4"}>
               {filtered.map((c, index) => {
                 const href = c.link || visitUrl;
                 const isCode = c.couponType === "code";
@@ -260,59 +262,55 @@ export default function StorePageClient({
                   window.open(clickUrl, "_blank", "noopener,noreferrer");
                 };
                 const expiryDate = c.expiry
-                  ? new Date(c.expiry).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
-                  : "01/01/2027";
-                const dateAvailable = c.createdAt
-                  ? new Date(c.createdAt).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
-                  : "01/01/2025";
-                const usedCount = 900 + (index % 200);
+                  ? new Date(c.expiry).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })
+                  : "31 Dec, 2027";
+                const codeId = c.id.slice(-5);
                 const partialReveal = c.couponCode && String(c.couponCode).trim().length >= 2
                   ? String(c.couponCode).trim().slice(-2)
                   : String(percent);
                 return (
                   <li
                     key={c.id}
-                    className="flex flex-col rounded-xl border border-zinc-200 bg-white p-4 shadow-md sm:p-5"
+                    className={`flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md ${viewMode === "grid" ? "" : "sm:flex-row"} ${viewMode === "grid" ? "items-center gap-4 p-5" : "sm:items-center sm:gap-5 sm:p-5"}`}
                   >
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex min-w-0 flex-1 items-center gap-4">
-                        {/* Circular % OFF badge */}
-                        <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border-2 border-blue-500 bg-white">
-                          <span className="text-lg font-bold leading-tight text-zinc-900">{percent}%</span>
-                          <span className="text-[10px] font-semibold uppercase leading-tight text-zinc-600">OFF</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-bold text-zinc-900">
-                            {dealTitle.includes("%") ? dealTitle : `${percent}% Off ${displayName} Coupon Code`}
-                          </h3>
-                        </div>
+                    {/* Circular discount box - orange gradient */}
+                    <div className="flex shrink-0 items-center justify-center">
+                      <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-inner sm:h-28 sm:w-28">
+                        <span className="text-lg font-bold leading-tight sm:text-xl">{percent}%</span>
+                        <span className="text-[10px] font-semibold uppercase leading-tight opacity-95 sm:text-xs">OFF</span>
+                        <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide opacity-90 sm:text-[10px]">Savingshub4u</span>
                       </div>
-                      {/* GET CODE + partial reveal */}
-                      <div className="relative flex shrink-0 items-center group">
+                    </div>
+                    <div className={`flex flex-1 flex-col p-4 pt-0 ${viewMode === "list" ? "sm:flex-row sm:items-center sm:justify-between sm:pt-4" : "sm:pt-0"}`}>
+                      <div className="min-w-0 flex-1">
+                        {index === 0 && (
+                          <span className="mb-2 inline-block rounded bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">Exclusive</span>
+                        )}
+                        <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          {expiryDate}
+                        </p>
+                        <h3 className="mt-1 font-bold text-zinc-900">
+                          {dealTitle.includes("%") ? dealTitle : `${percent}% Off All Products - Limited Stock`}
+                        </h3>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                          {codeId}
+                        </p>
+                      </div>
+                      <div className="mt-3 flex items-center gap-3 sm:mt-0 sm:shrink-0">
                         <button
                           type="button"
                           onClick={handleCouponClick}
-                          className="h-10 rounded-full bg-blue-600 pl-6 pr-14 text-sm font-semibold text-white transition hover:bg-blue-700"
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                         >
-                          {isCode ? "Get Code" : "Get Deal"}
+                          {isCode ? "GET CODE" : "GET DEAL"}
                         </button>
-                        <span
-                          className="pointer-events-none absolute right-9 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[20px] border-l-[16px] border-y-transparent border-l-amber-400"
-                          aria-hidden
-                        />
-                        <span
-                          className="pointer-events-none absolute -right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-zinc-400 bg-white text-sm font-bold text-transparent transition-colors group-hover:text-zinc-700"
-                          aria-hidden
-                        >
-                          {partialReveal}
+                        <span className="flex items-center gap-1 text-xs text-zinc-500" title="Comments">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                          0
                         </span>
                       </div>
-                    </div>
-                    {/* Bottom row: Used, Date Available, Expiry Date */}
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3 text-xs text-zinc-500">
-                      <span>Used {usedCount} Times.</span>
-                      <span>Date Available: {dateAvailable}</span>
-                      <span className="sm:ml-auto">Expiry Date: {expiryDate}</span>
                     </div>
                   </li>
                 );
