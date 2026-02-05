@@ -32,7 +32,7 @@ export default function PromotionsHeader() {
   const [hasFetchedStores, setHasFetchedStores] = useState(false);
   const [loadingStores, setLoadingStores] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchWrapperRef = useRef<HTMLDivElement>(null);
+  const searchWrapperRef = useRef<HTMLFormElement>(null);
 
   const loadStores = useCallback(async () => {
     if (hasFetchedStores || loadingStores) return;
