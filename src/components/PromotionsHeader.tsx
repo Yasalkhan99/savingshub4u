@@ -10,8 +10,8 @@ const SITE_NAME = "SavingsHub4u";
 
 const navLinks = [
   { label: "Home", href: "/" },
-  { label: "Categories", href: "/categories" },
-  { label: "Brands", href: "/brands" },
+  { label: "Categories", href: "/promotions/categories" },
+  { label: "Brands", href: "/promotions/brands" },
   { label: "Promotions", href: "/promotions" },
   { label: "About Us", href: "/about" },
   { label: "Share A Coupon", href: "/promotions/share-a-coupon" },
@@ -92,7 +92,7 @@ export default function PromotionsHeader() {
       const slug = store.slug || slugify(store.name);
       setShowSuggestions(false);
       setSearchTerm("");
-      router.push(`/stores/${slug}`);
+      router.push(`/promotions/${slug}`);
     },
     [router],
   );

@@ -1853,7 +1853,7 @@ export default function AdminPage() {
                           Auto-generate from name
                         </label>
                       </div>
-                      <p className="mt-1 text-xs text-stone-500">URL will be: /stores/slug</p>
+                      <p className="mt-1 text-xs text-stone-500">URL will be: /promotions/slug</p>
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-medium text-stone-700">Logo Upload Method</label>

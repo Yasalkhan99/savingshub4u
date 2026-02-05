@@ -65,7 +65,7 @@ export default async function CategoryPage({
             </li>
             <li aria-hidden>›</li>
             <li>
-              <Link href="/categories" className="hover:text-zinc-700">
+              <Link href="/promotions/categories" className="hover:text-zinc-700">
                 Categories
               </Link>
             </li>
@@ -111,7 +111,7 @@ export default async function CategoryPage({
                     Expiry: {store.expiry}
                   </div>
                   <Link
-                    href={`/stores/${store.slug || slugify(store.name)}`}
+                    href={`/promotions/${store.slug || slugify(store.name)}`}
                     className="text-sm font-medium text-blue-600 hover:underline"
                   >
                     View coupons
@@ -142,7 +142,7 @@ export default async function CategoryPage({
                 <li><Link href="/about" className="hover:text-white">About Us</Link></li>
                 <li><Link href="/promotions" className="hover:text-white">Brands</Link></li>
                 <li><Link href="/contact" className="hover:text-white">Contact Us</Link></li>
-                <li><Link href="/categories" className="hover:text-white">Categories</Link></li>
+                <li><Link href="/promotions/categories" className="hover:text-white">Categories</Link></li>
                 <li><Link href="/promotions/share-a-coupon" className="hover:text-white">Share A Coupon</Link></li>
               </ul>
             </div>

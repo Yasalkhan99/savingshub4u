@@ -108,7 +108,7 @@ export default async function PromotionsPage({
                     Expiry: {store.expiry}
                   </div>
                   <Link
-                    href={`/stores/${store.slug || slugify(store.name)}`}
+                    href={`/promotions/${store.slug || slugify(store.name)}`}
                     className="text-sm font-medium text-blue-600 hover:underline"
                   >
                     Read More
@@ -216,7 +216,7 @@ export default async function PromotionsPage({
               {uniqueStores.map((store) => (
                   <Link
                     key={store.id}
-                    href={`/stores/${store.slug || slugify(store.name)}`}
+                    href={`/promotions/${store.slug || slugify(store.name)}`}
                     className="text-sm font-medium text-zinc-700 hover:text-blue-600 hover:underline"
                   >
                     {store.name}

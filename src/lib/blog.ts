@@ -99,4 +99,28 @@ export const getBlogData = cache(async (): Promise<BlogData> => {
   };
 });
 
+const fallbackHeroStatic: BlogPostWithContent = {
+  id: "",
+  title: "No posts yet",
+  excerpt: "Add posts from Admin → Blog.",
+  category: "NEWS",
+  slug: "",
+  image: "https://picsum.photos/id/1/1200/600",
+  featured: false,
+};
+
+/** Default blog data when getBlogData fails (e.g. admin route or missing file). */
+export function getDefaultBlogData(): BlogData {
+  return {
+    heroPost: fallbackHeroStatic,
+    featuredPosts: [],
+    mostPopularPosts: [],
+    latestPosts: [],
+    trendingPosts: [],
+    footerCategories: [],
+    navDropdownPosts: { fashion: [], lifestyle: [], featured: [] },
+    allPosts: [],
+  };
+}
+
 export { categories };

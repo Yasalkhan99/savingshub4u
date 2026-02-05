@@ -1,16 +1,8 @@
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
 import { Geist, Geist_Mono } from "next/font/google";
+import { BlogDataProvider } from "@/components/BlogDataProvider";
 import "./globals.css";
-import { getBlogData } from "@/lib/blog";
-
-const BlogDataProvider = dynamic(
-  () =>
-    import("@/components/BlogDataProvider").then((m) => ({
-      default: m.BlogDataProvider,
-    })),
-  { ssr: true }
-);
+import { getBlogData, getDefaultBlogData } from "@/lib/blog";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,7 +45,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const blogData = await getBlogData();
+  let blogData;
+  try {
+    blogData = await getBlogData();
+  } catch {
+    blogData = getDefaultBlogData();
+  }
   return (
     <html lang="en">
       <body

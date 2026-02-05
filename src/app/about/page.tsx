@@ -246,7 +246,7 @@ export default async function AboutPage() {
                 Favorite Categories
               </h4>
               <ul className="space-y-2 text-sm text-zinc-400">
-                <li><Link href="/categories" className="hover:text-white">Categories</Link></li>
+                <li><Link href="/promotions/categories" className="hover:text-white">Categories</Link></li>
                 <li><Link href="/promotions" className="hover:text-white">Promotions</Link></li>
                 <li><Link href="/promotions/share-a-coupon" className="hover:text-white">Share A Coupon</Link></li>
               </ul>
