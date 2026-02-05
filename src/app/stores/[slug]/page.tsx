@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import PromotionsHeader from "@/components/PromotionsHeader";
+import { getClickCounts } from "@/lib/clicks";
 import { getStorePageData } from "@/lib/stores";
 import type { Store } from "@/types/store";
 import StorePageClient from "./StorePageClient";
@@ -9,7 +10,10 @@ type Props = { params: Promise<{ slug: string }> };
 
 export default async function StorePage({ params }: Props) {
   const { slug } = await params;
-  const { storeInfo, coupons, otherStores } = await getStorePageData(slug);
+  const [{ storeInfo, coupons, otherStores }, clickCounts] = await Promise.all([
+    getStorePageData(slug),
+    getClickCounts(),
+  ]);
   if (!storeInfo) notFound();
 
   const codesCount = coupons.filter((c) => c.couponType === "code").length;
@@ -52,6 +56,7 @@ export default async function StorePage({ params }: Props) {
           codesCount={codesCount}
           dealsCount={dealsCount}
           visitUrl={visitUrl}
+          clickCounts={clickCounts}
         />
       </main>
 

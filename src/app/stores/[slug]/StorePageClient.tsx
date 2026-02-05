@@ -14,6 +14,7 @@ type Props = {
   codesCount: number;
   dealsCount: number;
   visitUrl: string;
+  clickCounts: Record<string, number>;
 };
 
 const DEFAULT_WHY_TRUST =
@@ -46,10 +47,12 @@ export default function StorePageClient({
   codesCount,
   dealsCount,
   visitUrl,
+  clickCounts: initialClickCounts,
 }: Props) {
   const [filter, setFilter] = useState<"all" | "code" | "deal">("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"ending" | "newest" | "used">("ending");
+  const [extraClicks, setExtraClicks] = useState<Record<string, number>>({});
   const [revealingCoupon, setRevealingCoupon] = useState<{
     code: string;
     title: string;
@@ -250,6 +253,7 @@ export default function StorePageClient({
                   storeId: c.id,
                 });
                 const handleCouponClick = () => {
+                  setExtraClicks((prev) => ({ ...prev, [c.id]: (prev[c.id] ?? 0) + 1 }));
                   setRevealingCoupon({
                     code: c.couponCode || "",
                     title: dealTitle,
@@ -264,14 +268,14 @@ export default function StorePageClient({
                 const expiryDate = c.expiry
                   ? new Date(c.expiry).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })
                   : "31 Dec, 2027";
-                const codeId = c.id.slice(-5);
+                const clickCount = (initialClickCounts[c.id] ?? 0) + (extraClicks[c.id] ?? 0);
                 const partialReveal = c.couponCode && String(c.couponCode).trim().length >= 2
                   ? String(c.couponCode).trim().slice(-2)
                   : String(percent);
                 return (
                   <li
                     key={c.id}
-                    className={`flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md ${viewMode === "grid" ? "" : "sm:flex-row"} ${viewMode === "grid" ? "items-center gap-4 p-5" : "sm:items-center sm:gap-5 sm:p-5"}`}
+                    className={`flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md ${viewMode === "grid" ? "items-stretch gap-4 p-5" : "sm:flex-row sm:items-center sm:gap-5 sm:p-5"}`}
                   >
                     {/* Circular discount box - orange gradient */}
                     <div className="flex shrink-0 items-center justify-center">
@@ -281,24 +285,24 @@ export default function StorePageClient({
                         <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide opacity-90 sm:text-[10px]">Savingshub4u</span>
                       </div>
                     </div>
-                    <div className={`flex flex-1 flex-col p-4 pt-0 ${viewMode === "list" ? "sm:flex-row sm:items-center sm:justify-between sm:pt-4" : "sm:pt-0"}`}>
-                      <div className="min-w-0 flex-1">
+                    <div className={`flex min-w-0 flex-1 flex-col items-start text-left p-4 pt-0 ${viewMode === "list" ? "sm:flex-row sm:items-center sm:justify-between sm:pt-4" : "sm:pt-0"}`}>
+                      <div className="min-w-0 w-full flex-1">
                         {index === 0 && (
                           <span className="mb-2 inline-block rounded bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">Exclusive</span>
                         )}
-                        <p className="flex items-center gap-1.5 text-xs text-zinc-500">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <p className="flex items-center gap-1.5 text-left text-xs text-zinc-500">
+                          <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           {expiryDate}
                         </p>
-                        <h3 className="mt-1 font-bold text-zinc-900">
+                        <h3 className="mt-1 text-left font-bold text-zinc-900">
                           {dealTitle.includes("%") ? dealTitle : `${percent}% Off All Products - Limited Stock`}
                         </h3>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-                          {codeId}
+                        <p className="mt-1 flex items-center gap-1 text-left text-xs text-zinc-500" title="Clicks">
+                          <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122m2.122-10.606l2.12 2.122M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          {clickCount} click{clickCount !== 1 ? "s" : ""}
                         </p>
                       </div>
-                      <div className="mt-3 flex items-center gap-3 sm:mt-0 sm:shrink-0">
+                      <div className="mt-3 flex w-full flex-shrink-0 items-center justify-start gap-3 sm:mt-0 sm:w-auto">
                         <button
                           type="button"
                           onClick={handleCouponClick}

@@ -138,12 +138,10 @@ export async function getStorePageData(slug: string): Promise<StorePageData> {
   const storeRow = matchingStores.find((r) => !hasCouponData(r));
   const rowWithLogo = matchingStores.find((r) => (r.logoUrl ?? "").trim() !== "");
   const storeInfo = storeRow ?? rowWithLogo ?? matchingStores[0] ?? null;
-  const legacyCoupons = matchingStores.filter(hasCouponData);
   const allCouponsFromTable = await getCoupons();
-  const couponsFromTable = allCouponsFromTable.filter(
+  const coupons = allCouponsFromTable.filter(
     (c) => c.status !== "disable" && slugMatches(c, wantRaw, wantCanonical)
   );
-  const coupons = [...legacyCoupons, ...couponsFromTable];
   const currentName = storeInfo?.name?.toLowerCase();
   const otherStores = enabledStores
     .filter((s) => s.name?.toLowerCase() !== currentName)
