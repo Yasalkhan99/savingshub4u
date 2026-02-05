@@ -77,6 +77,7 @@ export default function AdminPage() {
     imageAlt: "",
     priority: 0,
     active: true,
+    trending: false,
   });
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
   const [couponStatusFilter, setCouponStatusFilter] = useState<"all" | "enable" | "disable">("all");
@@ -504,6 +505,7 @@ export default function AdminPage() {
             priority: couponForm.priority,
             active: couponForm.active,
             imageAlt: couponForm.imageAlt.trim() || undefined,
+            trending: couponForm.trending,
           }),
         });
         if (!res.ok) {
@@ -539,6 +541,7 @@ export default function AdminPage() {
             priority: couponForm.priority,
             active: couponForm.active,
             imageAlt: couponForm.imageAlt.trim() || undefined,
+            trending: couponForm.trending,
             status: couponForm.active ? "enable" : "disable",
             ...(slugToUse != null && slugToUse !== "" && { slug: slugToUse }),
           }),
@@ -565,6 +568,7 @@ export default function AdminPage() {
         imageAlt: "",
         priority: 0,
         active: true,
+        trending: false,
       });
       await fetchStores();
     } catch (e) {
@@ -619,6 +623,7 @@ export default function AdminPage() {
       imageAlt: store.imageAlt ?? store.logoAltText ?? "",
       priority: store.priority ?? 0,
       active: store.active !== false,
+      trending: store.trending ?? false,
     });
     setSection("coupons");
     setShowCouponsCreateForm(true);
@@ -1339,6 +1344,15 @@ export default function AdminPage() {
                       />
                       <span className="text-sm font-medium text-stone-700">Active</span>
                     </label>
+                    <label className="flex cursor-pointer items-center gap-2 pt-6">
+                      <input
+                        type="checkbox"
+                        checked={couponForm.trending}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, trending: e.target.checked }))}
+                        className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-sm font-medium text-stone-700">Mark as Trending</span>
+                    </label>
                   </div>
                   <button
                     type="submit"
@@ -1370,6 +1384,7 @@ export default function AdminPage() {
                           imageAlt: "",
                           priority: 0,
                           active: true,
+                          trending: false,
                         });
                       }}
                       className="ml-3 rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"

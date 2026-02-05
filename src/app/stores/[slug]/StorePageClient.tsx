@@ -235,7 +235,7 @@ export default function StorePageClient({
               No offers in this category.
             </div>
           ) : (
-            <ul className={viewMode === "grid" ? "grid gap-2 sm:grid-cols-2 sm:gap-3" : "space-y-4"}>
+            <ul className={viewMode === "grid" ? "grid gap-5 sm:grid-cols-2 sm:gap-6" : "space-y-6"}>
               {filtered.map((c, index) => {
                 const href = c.link || visitUrl;
                 const isCode = c.couponType === "code";
@@ -275,7 +275,7 @@ export default function StorePageClient({
                 return (
                   <li
                     key={c.id}
-                    className={`flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md ${viewMode === "grid" ? "items-stretch gap-4 p-5" : "sm:flex-row sm:items-center sm:gap-5 sm:p-5"}`}
+                    className={`flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md ${viewMode === "grid" ? "items-stretch gap-5 p-6" : "sm:flex-row sm:items-center sm:gap-6 sm:p-6"}`}
                   >
                     {/* Circular discount box - orange gradient */}
                     <div className="flex shrink-0 items-center justify-center">
@@ -285,24 +285,24 @@ export default function StorePageClient({
                         <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide opacity-90 sm:text-[10px]">Savingshub4u</span>
                       </div>
                     </div>
-                    <div className={`flex min-w-0 flex-1 flex-col items-start text-left p-4 pt-0 ${viewMode === "list" ? "sm:flex-row sm:items-center sm:justify-between sm:pt-4" : "sm:pt-0"}`}>
-                      <div className="min-w-0 w-full flex-1">
-                        {index === 0 && (
-                          <span className="mb-2 inline-block rounded bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">Exclusive</span>
+                    <div className={`flex min-w-0 flex-1 flex-col items-start text-left p-5 pt-0 ${viewMode === "list" ? "sm:flex-row sm:items-center sm:justify-between sm:pt-5" : "sm:pt-0"}`}>
+                      <div className="min-w-0 w-full flex-1 space-y-2">
+                        {c.trending === true && (
+                          <span className="mb-1 inline-block rounded bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">Exclusive</span>
                         )}
                         <p className="flex items-center gap-1.5 text-left text-xs text-zinc-500">
                           <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           {expiryDate}
                         </p>
-                        <h3 className="mt-1 text-left font-bold text-zinc-900">
+                        <h3 className="text-left font-bold text-zinc-900">
                           {dealTitle.includes("%") ? dealTitle : `${percent}% Off All Products - Limited Stock`}
                         </h3>
-                        <p className="mt-1 flex items-center gap-1 text-left text-xs text-zinc-500" title="Clicks">
+                        <p className="flex items-center gap-1 text-left text-xs text-zinc-500" title="Clicks">
                           <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122m2.122-10.606l2.12 2.122M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           {clickCount} click{clickCount !== 1 ? "s" : ""}
                         </p>
                       </div>
-                      <div className="mt-3 flex w-full flex-shrink-0 items-center justify-start gap-3 sm:mt-0 sm:w-auto">
+                      <div className="mt-5 flex w-full flex-shrink-0 items-center justify-start gap-3 sm:mt-0 sm:w-auto">
                         <button
                           type="button"
                           onClick={handleCouponClick}
