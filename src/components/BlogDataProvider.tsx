@@ -25,7 +25,7 @@ export function useBlogData(): BlogDataContextValue {
   return value;
 }
 
-export function BlogDataProvider({
+function BlogDataProvider({
   initialData,
   children,
 }: {
@@ -38,3 +38,6 @@ export function BlogDataProvider({
     </BlogDataContext.Provider>
   );
 }
+
+export { BlogDataProvider };
+export default BlogDataProvider;

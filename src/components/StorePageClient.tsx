@@ -40,6 +40,28 @@ function getPercentFromTitle(title: string, defaultPercent = 10): number {
   return defaultPercent;
 }
 
+/** True if coupon title looks like a shipping/delivery offer */
+function isShippingCoupon(title: string): boolean {
+  const t = (title || "").toLowerCase();
+  return /\b(free\s*)?(delivery|shipping)\b/.test(t) || /\bdelivery\b/.test(t) || /\bshipping\b/.test(t);
+}
+
+/** Badge: coupon.badgeLabel overrides; else UK store = Free Delivery, US = Free Shipping; else X% OFF. */
+function getBadgeForCoupon(
+  dealTitle: string,
+  countryCodes: string | undefined,
+  couponBadgeLabel?: "" | "free_shipping" | "free_delivery"
+): { type: "percent"; percent: number } | { type: "text"; line1: string } {
+  if (couponBadgeLabel === "free_shipping") return { type: "text", line1: "Free Shipping" };
+  if (couponBadgeLabel === "free_delivery") return { type: "text", line1: "Free Delivery" };
+  const codes = (countryCodes ?? "").toUpperCase().replace(/\s/g, "");
+  const isUK = /\b(GB|UK)\b/.test(codes) || codes === "GB" || codes === "UK";
+  const isUS = /\bUS\b/.test(codes) || codes === "US";
+  if (isUK) return { type: "text", line1: "Free Delivery" };
+  if (isUS) return { type: "text", line1: "Free Shipping" };
+  return { type: "percent", percent: getPercentFromTitle(dealTitle, 10) };
+}
+
 /** Format expiry for display - use UTC to avoid server/client hydration mismatch */
 function formatExpiry(expiry: string | undefined): string {
   if (!expiry || !expiry.trim()) return "31 Dec, 2027";
@@ -83,7 +105,8 @@ export default function StorePageClient({
 
   const whyTrustUs = storeInfo.whyTrustUs?.trim() || DEFAULT_WHY_TRUST;
   const moreInfo = storeInfo.moreInfo?.trim();
-  const displayName = storeInfo.subStoreName || storeInfo.name;
+  const displayNameRaw = storeInfo.subStoreName || storeInfo.name;
+  const displayName = (displayNameRaw ?? "").replace(/\s*Discount Code\s*$/i, "").trim() || displayNameRaw || "";
   const faqsToShow = Array.isArray(storeInfo.faqs) && storeInfo.faqs.length > 0
     ? storeInfo.faqs.filter((f) => (String(f?.q ?? "").trim() !== "" || String(f?.a ?? "").trim() !== ""))
     : DEFAULT_FAQS;
@@ -112,27 +135,19 @@ export default function StorePageClient({
         {/* Left Sidebar - Couponly style */}
         <aside className="order-1 shrink-0 lg:w-72">
           <div className="sticky top-4 space-y-6">
-            {/* Store card: circular logo, Up To X% OFF, GO TO SHOP, location */}
+            {/* Store card: logo (rectangle), store name, location */}
             <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col items-center text-center">
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-zinc-100 bg-white shadow-md ring-1 ring-zinc-200/60">
+                <div className="flex h-28 w-full max-w-[200px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-100 bg-white p-4 shadow-md ring-1 ring-zinc-200/60 sm:h-32 sm:max-w-[240px] sm:p-5">
                   {storeInfo.logoUrl ? (
-                    <div className="relative h-full w-full bg-white">
-                      <Image src={storeInfo.logoUrl} alt={storeInfo.logoAltText || storeInfo.name} fill className="object-contain p-2" sizes="96px" unoptimized />
+                    <div className="relative h-full w-full min-h-[80px] bg-white">
+                      <Image src={storeInfo.logoUrl} alt={storeInfo.logoAltText || storeInfo.name} fill className="object-contain" sizes="(max-width: 640px) 200px, 240px" unoptimized />
                     </div>
                   ) : (
                     <span className="text-2xl font-bold text-zinc-700">{displayName.slice(0, 4).toUpperCase()}</span>
                   )}
                 </div>
-                <p className="mt-2 text-sm font-semibold text-zinc-900">{displayName}</p>
-                <a
-                  href={visitUrl.startsWith("http") ? visitUrl : `https://${visitUrl}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
-                >
-                  GO TO SHOP
-                </a>
+                <p className="mt-3 text-sm font-semibold text-zinc-900">{displayName}</p>
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
                   <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                   {locationLabel}
@@ -167,7 +182,7 @@ export default function StorePageClient({
           {/* Store name + Discount Code heading, grid/list + sort */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-bold text-zinc-900 sm:text-2xl">
-              {(storeInfo.storePageHeading ?? "").trim() || `${displayName} Discount Code`}
+              {(storeInfo.storePageHeading ?? "").trim() || displayName}
             </h2>
             <div className="flex items-center gap-2">
               <div className="flex rounded border border-zinc-200 bg-white overflow-hidden">
@@ -214,7 +229,8 @@ export default function StorePageClient({
                   ? `/api/click?storeId=${encodeURIComponent(c.id)}&redirect=${encodeURIComponent(href)}`
                   : href;
                 const dealTitle = (c.couponTitle ?? "").trim() || (isCode ? `Use code ${c.couponCode || ""}` : "Deal");
-                const percent = getPercentFromTitle(dealTitle, 10);
+                const badge = getBadgeForCoupon(dealTitle, storeInfo.countryCodes, c.badgeLabel);
+                const percent = badge.type === "percent" ? badge.percent : 10;
                 const revealParams = new URLSearchParams({
                   code: c.couponCode || "",
                   title: dealTitle,
@@ -244,10 +260,19 @@ export default function StorePageClient({
                     className={`flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md ${viewMode === "grid" ? "items-stretch gap-5 p-6" : "sm:flex-row sm:items-center sm:gap-6 sm:p-6"}`}
                   >
                     <div className="flex shrink-0 items-center justify-center">
-                      <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-inner sm:h-28 sm:w-28">
-                        <span className="text-lg font-bold leading-tight sm:text-xl">{percent}%</span>
-                        <span className="text-[10px] font-semibold uppercase leading-tight opacity-95 sm:text-xs">OFF</span>
-                        <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide opacity-90 sm:text-[10px]">Savingshub4u</span>
+                      <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 px-1 text-center text-white shadow-inner sm:h-28 sm:w-28">
+                        {badge.type === "text" ? (
+                          <>
+                            <span className="text-xs font-bold leading-tight sm:text-sm">{badge.line1}</span>
+                            <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide opacity-90 sm:text-[10px]">Savingshub4u</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-lg font-bold leading-tight sm:text-xl">{percent}%</span>
+                            <span className="text-[10px] font-semibold uppercase leading-tight opacity-95 sm:text-xs">OFF</span>
+                            <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide opacity-90 sm:text-[10px]">Savingshub4u</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className={`flex min-w-0 flex-1 flex-col items-start text-left p-5 pt-0 ${viewMode === "list" ? "sm:flex-row sm:items-center sm:justify-between sm:pt-5" : "sm:pt-0"}`}>

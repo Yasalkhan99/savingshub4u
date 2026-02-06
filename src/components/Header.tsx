@@ -107,7 +107,7 @@ export default function Header({ transparent }: HeaderProps = {}) {
         <div className="flex h-12 items-center justify-between gap-4 sm:h-14">
           <Link href="/" className="flex items-center" aria-label="SavingsHub4u">
             <Image
-              src={scrolled ? "/Logo%20Container.svg" : "/Logo%20Container%201.svg"}
+              src={isLight ? "/black final logo.svg" : "/final final logo.svg"}
               alt="SavingsHub4u"
               width={160}
               height={32}

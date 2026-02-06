@@ -116,7 +116,7 @@ export default function PromotionsHeader() {
         {/* Row 1: Logo + name | Rounded search + orange button | Two circular icons */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <Link href="/" className="flex shrink-0 items-center" aria-label={SITE_NAME}>
-            <Image src="/Logo%20Container.svg" alt={SITE_NAME} width={160} height={32} priority className="h-8 w-auto object-contain" />
+            <Image src="/black final logo.svg" alt={SITE_NAME} width={160} height={32} priority className="h-8 w-auto object-contain" />
           </Link>
           <form onSubmit={handleSearchSubmit} className="relative flex flex-1 justify-center md:max-w-md md:px-6" ref={searchWrapperRef}>
             <div className="flex w-full overflow-hidden rounded-full border border-zinc-200 bg-zinc-50/80 shadow-sm focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20">

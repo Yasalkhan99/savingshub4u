@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { BlogDataProvider } from "@/components/BlogDataProvider";
+import BlogDataProvider from "@/components/BlogDataProvider";
 import "./globals.css";
 import { getBlogData, getDefaultBlogData } from "@/lib/blog";
 
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
   keywords: ["coupons", "deals", "promo codes", "savings", "discounts", "SavingsHub4u"],
   metadataBase: new URL("https://savingshub4u.com"),
   icons: {
-    icon: "/Logo%20Icon.png",
-    apple: "/Logo%20Icon.png",
+    icon: "/fav%20icon%20final%20logo.png",
+    apple: "/fav%20icon%20final%20logo.png",
   },
   openGraph: {
     title: "SavingsHub4u – Your Gateway to Smart Savings & Best Coupons",

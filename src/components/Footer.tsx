@@ -42,17 +42,22 @@ export default function Footer() {
           ))}
         </div>
       </div>
-      {/* Bottom bar - red line on TOP, copyright (screenshot) */}
+      {/* Bottom bar - red line on TOP, logo + copyright */}
       <div className="border-t-2 border-red-600 bg-black/80 py-4">
-        <div className="mx-auto max-w-7xl px-4 text-center text-xs text-zinc-500 sm:px-6 lg:px-8">
-          <p>© {new Date().getFullYear()} SavingsHub4u.com. All rights reserved.</p>
-          <div className="mt-2 flex flex-wrap justify-center gap-4">
-            <Link href="/privacy" className="hover:text-zinc-400">
-              Privacy Policy
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <Link href="/" className="flex items-center" aria-label="SavingsHub4u">
+              <Image src="/final final logo.svg" alt="SavingsHub4u" width={140} height={28} className="h-7 w-auto object-contain" />
             </Link>
-            <Link href="/terms" className="hover:text-zinc-400">
-              Terms of Use
-            </Link>
+            <p className="text-xs text-zinc-500">© {new Date().getFullYear()} SavingsHub4u.com. All rights reserved.</p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <Link href="/privacy" className="hover:text-zinc-400">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="hover:text-zinc-400">
+                Terms of Use
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -97,37 +97,60 @@ export default async function PromotionsPage({
     <div className="min-h-screen bg-white text-zinc-900">
       <PromotionsHeader />
 
-      {/* Hero - light cream / peach background */}
-      <section className="bg-amber-50/95 px-4 py-12 sm:px-6 lg:px-8">
+      {/* Hero - peach background, two banner images (no Total Categories / AVG Reviews) */}
+      <section className="relative overflow-hidden bg-amber-50/95 px-4 py-12 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">
-              Discover The Best Affiliate <span className="text-blue-600">Coupons</span>
-            </h1>
-            <p className="mt-3 max-w-xl text-base text-zinc-600">
-              Save big on your favorite brands with our exclusive coupons, discount codes, and deals.
-            </p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-4">
-              <select
-                className="w-full rounded-lg border border-zinc-300 bg-white py-3 pl-4 pr-10 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-40 sm:min-w-[10rem]"
-                aria-label="Category"
-              >
-                <option value="">Category</option>
-                {STORE_CATEGORIES.slice(0, 8).map(({ name }) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="Coupon code here"
-                className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <Link
-                href="/promotions"
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700"
-              >
-                Search
-              </Link>
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl">
+                Discover The Best Affiliate <span className="text-blue-600">Coupons</span>
+              </h1>
+              <p className="mt-3 max-w-xl text-base text-zinc-600">
+                Save big on your favorite brands with our exclusive coupons, discount codes, and deals.
+              </p>
+              <div className="mt-6 max-w-2xl">
+                <form action="/promotions" method="get" className="flex overflow-hidden rounded-2xl border-2 border-zinc-200 bg-white shadow-md transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+                  <span className="flex items-center pl-5 text-zinc-400" aria-hidden>
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </span>
+                  <input
+                    type="search"
+                    name="q"
+                    placeholder="Find coupon or store..."
+                    className="min-w-0 flex-1 bg-transparent py-4 pl-3 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 focus:outline-none sm:py-5 sm:pl-4 sm:text-lg"
+                  />
+                  <button
+                    type="submit"
+                    className="shrink-0 bg-blue-600 px-6 font-semibold text-white transition hover:bg-blue-700 sm:px-8"
+                  >
+                    Search
+                  </button>
+                </form>
+              </div>
+            </div>
+            <div className="flex flex-1 items-end justify-center gap-4 lg:justify-end">
+              <div className="relative h-64 w-44 shrink-0 overflow-hidden rounded-2xl shadow-lg sm:h-72 sm:w-52">
+                <Image
+                  src="/banner-index-1.webp"
+                  alt="Save with coupons and deals"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 176px, 208px"
+                  priority
+                />
+              </div>
+              <div className="relative h-80 w-56 shrink-0 overflow-hidden rounded-2xl shadow-lg sm:h-96 sm:w-64">
+                <Image
+                  src="/banner-index-2.webp"
+                  alt="Best affiliate coupons and discounts"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 224px, 256px"
+                  priority
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -458,7 +481,7 @@ export default async function PromotionsPage({
             ))}
           </div>
           <div className="mt-6 text-center">
-            <Link href="/blog" className="inline-flex text-sm font-medium text-blue-600 hover:underline">
+            <Link href="/" className="inline-flex text-sm font-medium text-blue-600 hover:underline">
               View all articles →
             </Link>
           </div>

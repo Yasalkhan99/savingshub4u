@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 /**
  * Shared footer for promotions, brands, categories, share-a-coupon, about, and category [slug] pages.
@@ -12,10 +13,7 @@ export default function PromotionsFooter({ className }: { className?: string }) 
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Link href="/" className="flex items-center gap-2 text-lg font-bold text-white">
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
-              SavingsHub4u
+              <Image src="/final final logo.svg" alt="SavingsHub4u" width={140} height={28} className="h-7 w-auto object-contain" />
             </Link>
           </div>
           <div>

@@ -212,6 +212,7 @@ export async function POST(request: Request) {
       couponType,
       couponCode,
       couponTitle,
+      badgeLabel,
       priority,
       active,
       imageAlt,
@@ -266,6 +267,7 @@ export async function POST(request: Request) {
     (newStore as Store).couponType = couponType === "deal" ? "deal" : couponType === "code" ? "code" : undefined;
     if (couponCode != null && String(couponCode).trim() !== "") (newStore as Store).couponCode = String(couponCode).trim();
     if (couponTitle != null && String(couponTitle).trim() !== "") (newStore as Store).couponTitle = String(couponTitle).trim();
+    if (badgeLabel === "free_shipping" || badgeLabel === "free_delivery") (newStore as Store).badgeLabel = badgeLabel;
     if (priority != null && String(priority) !== "" && !Number.isNaN(Number(priority))) (newStore as Store).priority = Number(priority);
     if (active === false) (newStore as Store).active = false;
     if (active === true) (newStore as Store).active = true;
@@ -346,7 +348,7 @@ export async function PATCH(request: Request) {
         "name", "logoUrl", "description", "expiry", "link", "subStoreName", "slug",
         "logoAltText", "logoMethod", "trackingUrl", "countryCodes",
         "websiteUrl", "category", "whyTrustUs", "moreInfo", "seoTitle", "seoMetaDesc",
-        "trending", "status", "faqs", "couponType", "couponCode", "couponTitle", "priority", "active", "imageAlt",
+        "trending", "status", "faqs", "couponType", "couponCode", "couponTitle", "badgeLabel", "priority", "active", "imageAlt",
       ];
       const nextCoupon = { ...current };
       for (const key of allowed) {
@@ -367,7 +369,7 @@ export async function PATCH(request: Request) {
       "name", "logoUrl", "description", "expiry", "link", "subStoreName", "storePageHeading", "slug",
       "logoAltText", "logoMethod", "trackingUrl", "countryCodes",
       "websiteUrl", "category", "whyTrustUs", "moreInfo", "seoTitle", "seoMetaDesc",
-      "trending", "status", "faqs", "couponType", "couponCode", "couponTitle", "priority", "active", "imageAlt",
+      "trending", "status", "faqs", "couponType", "couponCode", "couponTitle", "badgeLabel", "priority", "active", "imageAlt",
     ];
     const nextStore = { ...current };
     for (const key of allowed) {

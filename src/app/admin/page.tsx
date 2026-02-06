@@ -70,6 +70,7 @@ export default function AdminPage() {
     couponType: "deal" as "code" | "deal",
     couponCode: "",
     couponTitle: "",
+    badgeLabel: "" as "" | "free_shipping" | "free_delivery",
     logoMethod: "url" as "url" | "upload",
     logoUrl: "",
     description: "",
@@ -494,6 +495,7 @@ export default function AdminPage() {
             couponType: couponForm.couponType,
             couponCode: couponForm.couponCode.trim() || undefined,
             couponTitle: couponForm.couponTitle.trim() || undefined,
+            badgeLabel: couponForm.badgeLabel || undefined,
             priority: couponForm.priority,
             active: couponForm.active,
             imageAlt: couponForm.imageAlt.trim() || undefined,
@@ -530,6 +532,7 @@ export default function AdminPage() {
             couponType: couponForm.couponType,
             couponCode: couponForm.couponCode.trim() || undefined,
             couponTitle: couponForm.couponTitle.trim() || undefined,
+            badgeLabel: couponForm.badgeLabel || undefined,
             priority: couponForm.priority,
             active: couponForm.active,
             imageAlt: couponForm.imageAlt.trim() || undefined,
@@ -552,6 +555,7 @@ export default function AdminPage() {
         couponType: "deal",
         couponCode: "",
         couponTitle: "",
+        badgeLabel: "",
         logoMethod: "url",
         logoUrl: "",
         description: "",
@@ -607,6 +611,7 @@ export default function AdminPage() {
       couponType: (store.couponType as "code" | "deal") || "deal",
       couponCode: store.couponCode ?? "",
       couponTitle: store.couponTitle ?? "",
+      badgeLabel: (store.badgeLabel === "free_shipping" || store.badgeLabel === "free_delivery" ? store.badgeLabel : "") as "" | "free_shipping" | "free_delivery",
       logoMethod: "url",
       logoUrl: store.logoUrl ?? "",
       description: store.description ?? "",
@@ -1242,6 +1247,19 @@ export default function AdminPage() {
                     />
                   </div>
                   <div>
+                    <label className="mb-1 block text-sm font-medium text-stone-700">Badge label (optional)</label>
+                    <select
+                      value={couponForm.badgeLabel ?? ""}
+                      onChange={(e) => setCouponForm((f) => ({ ...f, badgeLabel: (e.target.value || "") as "" | "free_shipping" | "free_delivery" }))}
+                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                    >
+                      <option value="">Default (percentage or store region)</option>
+                      <option value="free_shipping">Free Shipping</option>
+                      <option value="free_delivery">Free Delivery</option>
+                    </select>
+                    <p className="mt-1 text-xs text-stone-500">Override badge on coupon card: show &quot;Free Shipping&quot; or &quot;Free Delivery&quot; instead of percentage.</p>
+                  </div>
+                  <div>
                     <label className="mb-2 block text-sm font-medium text-stone-700">Logo Upload Method</label>
                     <div className="flex gap-4">
                       <label className="flex cursor-pointer items-center gap-2">
@@ -1371,6 +1389,7 @@ export default function AdminPage() {
                           couponType: "deal",
                           couponCode: "",
                           couponTitle: "",
+                          badgeLabel: "",
                           logoMethod: "url",
                           logoUrl: "",
                           description: "",
@@ -2213,6 +2232,14 @@ export default function AdminPage() {
                                 <input type="text" value={couponForm.couponTitle ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, couponTitle: e.target.value }))} placeholder="e.g. 20% Off" className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
                               </div>
                               <div>
+                                <label className="mb-1 block text-xs font-medium text-stone-600">Badge label (optional)</label>
+                                <select value={couponForm.badgeLabel ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, badgeLabel: (e.target.value || "") as "" | "free_shipping" | "free_delivery" }))} className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600">
+                                  <option value="">Default (percentage or store region)</option>
+                                  <option value="free_shipping">Free Shipping</option>
+                                  <option value="free_delivery">Free Delivery</option>
+                                </select>
+                              </div>
+                              <div>
                                 <label className="mb-1 block text-xs font-medium text-stone-600">Description *</label>
                                 <textarea required value={couponForm.description ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, description: e.target.value }))} placeholder="Coupon or deal description" rows={2} className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
                               </div>
@@ -2228,7 +2255,7 @@ export default function AdminPage() {
                                 <button type="submit" disabled={submitting} className="rounded border-2 border-sky-600 bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">
                                   {submitting ? "Creating…" : "Create Coupon"}
                                 </button>
-                                <button type="button" onClick={() => { setShowAddCouponForStore(false); setCouponForm((f) => ({ ...f, couponCode: "", couponTitle: "", description: storeForm.description ?? "" })); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
+                                <button type="button" onClick={() => { setShowAddCouponForStore(false); setCouponForm((f) => ({ ...f, couponCode: "", couponTitle: "", badgeLabel: "", description: storeForm.description ?? "" })); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
                                   Cancel
                                 </button>
                               </div>

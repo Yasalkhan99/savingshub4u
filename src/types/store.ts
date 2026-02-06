@@ -30,6 +30,8 @@ export type Store = {
   couponType?: "code" | "deal";
   couponCode?: string;
   couponTitle?: string;
+  /** Badge on coupon card: "free_shipping" | "free_delivery" | empty = use store region / percentage */
+  badgeLabel?: "" | "free_shipping" | "free_delivery";
   priority?: number;
   active?: boolean;
   imageAlt?: string;
