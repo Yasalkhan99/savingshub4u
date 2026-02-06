@@ -1,9 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import PromotionsHeader from "@/components/PromotionsHeader";
 import CategoriesSidebar from "@/components/CategoriesSidebar";
 import Pagination from "@/components/Pagination";
+import PromotionsFooter from "@/components/PromotionsFooter";
+import PromotionsHeader from "@/components/PromotionsHeader";
+import { getCategoryBySlug } from "@/data/categories";
 import { getStores, slugify } from "@/lib/stores";
 
 const PER_PAGE = 24;
@@ -25,19 +27,26 @@ export default async function CategoryPage({
   const slugLower = categorySlug.toLowerCase();
   const stores = await getStores();
   const enabled = stores.filter((s) => s.status !== "disable");
-  const isOther = slugLower === "other";
-  const inCategory = enabled.filter((s) => {
-    const cat = s.category?.trim();
-    if (isOther) return !cat;
-    if (!cat) return false;
-    return categoryToSlug(cat) === slugLower;
-  });
 
-  if (inCategory.length === 0) {
+  const fixedCategory = getCategoryBySlug(slugLower);
+  const isOther = slugLower === "other";
+
+  let categoryName: string;
+  let inCategory: typeof enabled;
+
+  if (fixedCategory) {
+    categoryName = fixedCategory.name;
+    inCategory = enabled.filter((s) => {
+      const cat = s.category?.trim();
+      return cat ? categoryToSlug(cat) === slugLower : false;
+    });
+  } else if (isOther) {
+    categoryName = "Other";
+    inCategory = enabled.filter((s) => !s.category?.trim());
+  } else {
     notFound();
   }
 
-  const categoryName = isOther ? "Other" : (inCategory[0].category!);
   const uniqueStores = inCategory.filter(
     (s, i, arr) => arr.findIndex((x) => x.name?.toLowerCase() === s.name?.toLowerCase()) === i
   );
@@ -131,41 +140,7 @@ export default async function CategoryPage({
         </div>
       </main>
 
-      <footer className="mt-12 border-t border-zinc-200 bg-zinc-900 text-white">
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-zinc-300">
-                Important Links
-              </h4>
-              <ul className="space-y-2 text-sm text-zinc-400">
-                <li><Link href="/about" className="hover:text-white">About Us</Link></li>
-                <li><Link href="/promotions" className="hover:text-white">Brands</Link></li>
-                <li><Link href="/contact" className="hover:text-white">Contact Us</Link></li>
-                <li><Link href="/promotions/categories" className="hover:text-white">Categories</Link></li>
-                <li><Link href="/promotions/share-a-coupon" className="hover:text-white">Share A Coupon</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-zinc-300">
-                Events
-              </h4>
-              <ul className="space-y-2 text-sm text-zinc-400">
-                <li><Link href="/deals/black-friday" className="hover:text-white">Black Friday Coupons/Deals</Link></li>
-                <li><Link href="/deals/christmas" className="hover:text-white">Christmas Coupons/Deals</Link></li>
-                <li><Link href="/deals/cyber-monday" className="hover:text-white">Cyber Monday Coupons/Deals</Link></li>
-                <li><Link href="/deals/easter" className="hover:text-white">Easter Coupons/Deals</Link></li>
-                <li><Link href="/deals/halloween" className="hover:text-white">Halloween Coupons/Deals</Link></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div className="border-t border-zinc-800 bg-zinc-950 px-4 py-4">
-          <div className="mx-auto max-w-6xl text-center text-xs text-zinc-500 sm:px-6 lg:px-8">
-            <p>Copyright © {new Date().getFullYear()} SavingsHub4u. All Rights Reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <PromotionsFooter />
     </div>
   );
 }

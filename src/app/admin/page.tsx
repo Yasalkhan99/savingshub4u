@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Store } from "@/types/store";
 import type { BlogPost } from "@/data/blog";
 import { categories as blogCategories } from "@/data/blog";
+import { STORE_CATEGORY_NAMES } from "@/data/categories";
 import { stripHtml, slugify } from "@/lib/slugify";
 import { hasCouponData } from "@/lib/store-utils";
 
@@ -163,16 +164,6 @@ export default function AdminPage() {
     avgUsageRate: string;
   } | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
-
-  /** Unique store categories from existing stores (for Category dropdown) */
-  const storeCategories = useMemo(() => {
-    const set = new Set<string>();
-    stores.forEach((s) => {
-      const cat = (s.category ?? "").trim();
-      if (cat) set.add(cat);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  }, [stores]);
 
   const fetchStores = async () => {
     try {
@@ -2016,7 +2007,7 @@ export default function AdminPage() {
                       className="w-full max-w-xs rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                     >
                       <option value="">No Category</option>
-                      {storeCategories.map((cat) => (
+                      {STORE_CATEGORY_NAMES.map((cat) => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>

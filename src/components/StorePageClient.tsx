@@ -62,7 +62,7 @@ export default function StorePageClient({
   clickCounts: initialClickCounts,
 }: Props) {
   const [filter, setFilter] = useState<"all" | "code" | "deal">("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [sortBy, setSortBy] = useState<"ending" | "newest" | "used">("ending");
   const [extraClicks, setExtraClicks] = useState<Record<string, number>>({});
   const [revealingCoupon, setRevealingCoupon] = useState<{
@@ -90,9 +90,6 @@ export default function StorePageClient({
 
   const topCodes = coupons.filter((c) => c.couponType === "code").slice(0, 5);
   const newCodes = coupons.slice(0, 5);
-  const bestPercent = coupons.length > 0
-    ? Math.max(...coupons.map((c) => getPercentFromTitle(c.couponTitle || c.couponCode || "", 10)), 10)
-    : 25;
   const locationLabel = storeInfo.countryCodes?.trim() || "Worldwide";
 
   const categoryLinks = [
@@ -103,13 +100,14 @@ export default function StorePageClient({
 
   return (
     <>
-      {revealingCoupon && (
+      {revealingCoupon ? (
         <CouponRevealModal
+          key={revealingCoupon.storeId}
           {...revealingCoupon}
           onClose={() => setRevealingCoupon(null)}
           blurBackdrop
         />
-      )}
+      ) : null}
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
         {/* Left Sidebar - Couponly style */}
         <aside className="order-1 shrink-0 lg:w-72">
@@ -127,7 +125,6 @@ export default function StorePageClient({
                   )}
                 </div>
                 <p className="mt-2 text-sm font-semibold text-zinc-900">{displayName}</p>
-                <p className="mt-1 text-sm font-bold text-zinc-900">Up To {bestPercent}% OFF</p>
                 <a
                   href={visitUrl.startsWith("http") ? visitUrl : `https://${visitUrl}`}
                   target="_blank"
@@ -143,34 +140,6 @@ export default function StorePageClient({
               </div>
             </div>
 
-            {/* Deals or coupon - tabs */}
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">Deals or coupon</h2>
-              <div className="flex flex-wrap gap-1">
-                <button
-                  type="button"
-                  onClick={() => setFilter("code")}
-                  className={`rounded px-3 py-2 text-xs font-semibold uppercase transition ${filter === "code" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
-                >
-                  Online Codes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilter("all")}
-                  className={`rounded px-3 py-2 text-xs font-semibold uppercase transition ${filter === "all" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
-                >
-                  Store Codes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilter("deal")}
-                  className={`rounded px-3 py-2 text-xs font-semibold uppercase transition ${filter === "deal" ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
-                >
-                  Online Sales
-                </button>
-              </div>
-            </div>
-
             {/* About Store */}
             <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
               <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">About Store</h2>
@@ -179,29 +148,17 @@ export default function StorePageClient({
               </p>
             </div>
 
-            {otherStores.length > 0 && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-600">Related Stores</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {otherStores.slice(0, 9).map((s) => (
-                    <Link
-                      key={s.id}
-                      href={`/promotions/${s.slug || slugify(s.name)}`}
-                      className="flex flex-col items-center gap-1 rounded-lg border border-zinc-100 p-2 transition hover:border-zinc-200 hover:bg-zinc-50"
-                    >
-                      {s.logoUrl ? (
-                        <div className="relative h-8 w-8">
-                          <Image src={s.logoUrl} alt={s.name} fill className="object-contain" sizes="32px" unoptimized />
-                        </div>
-                      ) : (
-                        <span className="text-xs font-medium text-zinc-600">{s.name.slice(0, 2)}</span>
-                      )}
-                      <span className="truncate text-xs text-zinc-600" title={s.name}>{s.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-600">
+                How To Use {displayName} Coupons
+              </h3>
+              <ol className="list-inside list-decimal space-y-2 text-sm text-zinc-600">
+                <li>Click &quot;Get Code&quot; and copy the code.</li>
+                <li>Go to {displayName}&apos;s website and add items to your cart.</li>
+                <li>At checkout, paste the code in the promo or discount code box.</li>
+                <li>Click apply and complete your order to get the discount.</li>
+              </ol>
+            </div>
           </div>
         </aside>
 
@@ -243,13 +200,14 @@ export default function StorePageClient({
             </div>
           </div>
 
-          {filtered.length === 0 ? (
-            <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center text-zinc-500 shadow-sm">
-              No offers in this category.
-            </div>
-          ) : (
-            <ul className={viewMode === "grid" ? "grid gap-5 sm:grid-cols-2 sm:gap-6" : "space-y-6"}>
-              {filtered.map((c, index) => {
+          <div role="region" aria-label="Coupon list">
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center text-zinc-500 shadow-sm">
+                No offers in this category.
+              </div>
+            ) : (
+              <ul className={viewMode === "grid" ? "grid gap-5 sm:grid-cols-2 sm:gap-6" : "space-y-6"}>
+                {filtered.map((c) => {
                 const href = c.link || visitUrl;
                 const isCode = c.couponType === "code";
                 const clickUrl = href.startsWith("http")
@@ -326,8 +284,9 @@ export default function StorePageClient({
                   </li>
                 );
               })}
-            </ul>
-          )}
+              </ul>
+            )}
+          </div>
 
           {/* Shopping Tips */}
           <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
