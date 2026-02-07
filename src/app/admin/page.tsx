@@ -70,7 +70,9 @@ export default function AdminPage() {
     couponType: "deal" as "code" | "deal",
     couponCode: "",
     couponTitle: "",
-    badgeLabel: "" as "" | "free_shipping" | "free_delivery",
+    badgeLabel: "",
+    badgeShipping: "",
+    badgeOffer: "",
     logoMethod: "url" as "url" | "upload",
     logoUrl: "",
     description: "",
@@ -496,6 +498,8 @@ export default function AdminPage() {
             couponCode: couponForm.couponCode.trim() || undefined,
             couponTitle: couponForm.couponTitle.trim() || undefined,
             badgeLabel: couponForm.badgeLabel || undefined,
+            badgeShipping: couponForm.badgeShipping || undefined,
+            badgeOffer: couponForm.badgeOffer?.trim() || undefined,
             priority: couponForm.priority,
             active: couponForm.active,
             imageAlt: couponForm.imageAlt.trim() || undefined,
@@ -533,6 +537,8 @@ export default function AdminPage() {
             couponCode: couponForm.couponCode.trim() || undefined,
             couponTitle: couponForm.couponTitle.trim() || undefined,
             badgeLabel: couponForm.badgeLabel || undefined,
+            badgeShipping: couponForm.badgeShipping || undefined,
+            badgeOffer: couponForm.badgeOffer?.trim() || undefined,
             priority: couponForm.priority,
             active: couponForm.active,
             imageAlt: couponForm.imageAlt.trim() || undefined,
@@ -556,6 +562,8 @@ export default function AdminPage() {
         couponCode: "",
         couponTitle: "",
         badgeLabel: "",
+        badgeShipping: "",
+        badgeOffer: "",
         logoMethod: "url",
         logoUrl: "",
         description: "",
@@ -611,7 +619,9 @@ export default function AdminPage() {
       couponType: (store.couponType as "code" | "deal") || "deal",
       couponCode: store.couponCode ?? "",
       couponTitle: store.couponTitle ?? "",
-      badgeLabel: (store.badgeLabel === "free_shipping" || store.badgeLabel === "free_delivery" ? store.badgeLabel : "") as "" | "free_shipping" | "free_delivery",
+      badgeLabel: store.badgeLabel ?? "",
+      badgeShipping: store.badgeShipping ?? "",
+      badgeOffer: store.badgeOffer ?? "",
       logoMethod: "url",
       logoUrl: store.logoUrl ?? "",
       description: store.description ?? "",
@@ -1246,19 +1256,29 @@ export default function AdminPage() {
                       className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
                     />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-stone-700">Badge label (optional)</label>
-                    <select
-                      value={couponForm.badgeLabel ?? ""}
-                      onChange={(e) => setCouponForm((f) => ({ ...f, badgeLabel: (e.target.value || "") as "" | "free_shipping" | "free_delivery" }))}
-                      className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
-                    >
-                      <option value="">Default (percentage or store region)</option>
-                      <option value="free_shipping">Free Shipping</option>
-                      <option value="free_delivery">Free Delivery</option>
-                    </select>
-                    <p className="mt-1 text-xs text-stone-500">Override badge on coupon card: show &quot;Free Shipping&quot; or &quot;Free Delivery&quot; instead of percentage.</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Badge – Free Shipping/Delivery (optional)</label>
+                      <input
+                        type="text"
+                        value={couponForm.badgeShipping ?? ""}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, badgeShipping: e.target.value }))}
+                        placeholder="e.g. Free Shipping, Free Delivery"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-stone-700">Badge – Percentage or amount (optional)</label>
+                      <input
+                        type="text"
+                        value={couponForm.badgeOffer ?? ""}
+                        onChange={(e) => setCouponForm((f) => ({ ...f, badgeOffer: e.target.value }))}
+                        placeholder="e.g. 20% OFF, $10 OFF"
+                        className="w-full rounded border border-stone-300 px-3 py-2 text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                      />
+                    </div>
                   </div>
+                  <p className="text-xs text-stone-500">Both can show in the orange circle. Leave both empty for default (percentage or store region).</p>
                   <div>
                     <label className="mb-2 block text-sm font-medium text-stone-700">Logo Upload Method</label>
                     <div className="flex gap-4">
@@ -1390,6 +1410,8 @@ export default function AdminPage() {
                           couponCode: "",
                           couponTitle: "",
                           badgeLabel: "",
+                          badgeShipping: "",
+                          badgeOffer: "",
                           logoMethod: "url",
                           logoUrl: "",
                           description: "",
@@ -2231,13 +2253,21 @@ export default function AdminPage() {
                                 <label className="mb-1 block text-xs font-medium text-stone-600">Coupon Title (Optional)</label>
                                 <input type="text" value={couponForm.couponTitle ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, couponTitle: e.target.value }))} placeholder="e.g. 20% Off" className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
                               </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-stone-600">Badge label (optional)</label>
-                                <select value={couponForm.badgeLabel ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, badgeLabel: (e.target.value || "") as "" | "free_shipping" | "free_delivery" }))} className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600">
-                                  <option value="">Default (percentage or store region)</option>
-                                  <option value="free_shipping">Free Shipping</option>
-                                  <option value="free_delivery">Free Delivery</option>
-                                </select>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-stone-600">Badge – Shipping/Delivery</label>
+                                  <input
+                                    type="text"
+                                    value={couponForm.badgeShipping ?? ""}
+                                    onChange={(e) => setCouponForm((f) => ({ ...f, badgeShipping: e.target.value }))}
+                                    placeholder="e.g. Free Shipping, Free Delivery"
+                                    className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-stone-600">Badge – % or amount</label>
+                                  <input type="text" value={couponForm.badgeOffer ?? ""} onChange={(e) => setCouponForm((f) => ({ ...f, badgeOffer: e.target.value }))} placeholder="e.g. 20% OFF, $10 OFF" className="w-full rounded border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600" />
+                                </div>
                               </div>
                               <div>
                                 <label className="mb-1 block text-xs font-medium text-stone-600">Description *</label>
@@ -2255,7 +2285,7 @@ export default function AdminPage() {
                                 <button type="submit" disabled={submitting} className="rounded border-2 border-sky-600 bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50">
                                   {submitting ? "Creating…" : "Create Coupon"}
                                 </button>
-                                <button type="button" onClick={() => { setShowAddCouponForStore(false); setCouponForm((f) => ({ ...f, couponCode: "", couponTitle: "", badgeLabel: "", description: storeForm.description ?? "" })); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
+                                <button type="button" onClick={() => { setShowAddCouponForStore(false); setCouponForm((f) => ({ ...f, couponCode: "", couponTitle: "", badgeLabel: "", badgeShipping: "", badgeOffer: "", description: storeForm.description ?? "" })); }} className="rounded border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
                                   Cancel
                                 </button>
                               </div>

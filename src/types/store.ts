@@ -30,8 +30,12 @@ export type Store = {
   couponType?: "code" | "deal";
   couponCode?: string;
   couponTitle?: string;
-  /** Badge on coupon card: "free_shipping" | "free_delivery" | empty = use store region / percentage */
-  badgeLabel?: "" | "free_shipping" | "free_delivery";
+  /** Badge on coupon card: any text (e.g. "Free Shipping", "20% OFF", "$10 OFF"). Empty = use store region / percentage. Legacy – prefer badgeShipping + badgeOffer. */
+  badgeLabel?: string;
+  /** Badge line 2 (or line 1 if no offer): any text e.g. "Free Shipping", "Free Delivery" (optional). */
+  badgeShipping?: string;
+  /** Badge line 2 (or only line): percentage or amount e.g. "20% OFF", "$10 OFF" (optional). */
+  badgeOffer?: string;
   priority?: number;
   active?: boolean;
   imageAlt?: string;

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
 
 type Props = {
   code?: string;
@@ -14,6 +13,12 @@ type Props = {
   onClose?: () => void;
   /** When true, use blurred backdrop so the page behind (e.g. store page) shows blurred */
   blurBackdrop?: boolean;
+  /** Optional: formatted expiry e.g. "20 Nov, 2025" */
+  expiry?: string;
+  /** True if coupon code type (show GET CODE), false for deal (show Get Deal) */
+  isCode?: boolean;
+  /** Show Exclusive badge */
+  trending?: boolean;
 };
 
 export default function CouponRevealModal({
@@ -25,8 +30,14 @@ export default function CouponRevealModal({
   storeId,
   onClose,
   blurBackdrop = false,
+  expiry,
+  isCode = false,
+  trending = false,
 }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const trackingUrl =
     storeId && redirect
@@ -54,92 +65,121 @@ export default function CouponRevealModal({
     else window.close();
   }, [onClose]);
 
+  /** Open tracking link in new tab; user stays on our site in current tab. Then close modal. */
+  const handleContinueToStore = useCallback(() => {
+    window.open(trackingUrl, "_blank", "noopener,noreferrer");
+    if (onClose) onClose();
+    else window.close();
+  }, [trackingUrl, onClose]);
+
+  // Avoid hydration mismatch: render same placeholder on server and initial client, then full modal after mount
+  if (!mounted) {
+    return (
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
+          blurBackdrop ? "bg-black/20 backdrop-blur-md" : "bg-black/60 backdrop-blur-sm"
+        }`}
+        suppressHydrationWarning
+      >
+        <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden h-80" />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
-        blurBackdrop ? "bg-white/10 backdrop-blur-xl" : "bg-black/60 backdrop-blur-sm"
+        blurBackdrop ? "bg-black/20 backdrop-blur-md" : "bg-black/60 backdrop-blur-sm"
       }`}
     >
-      <div className="w-full max-w-md rounded-2xl border-2 border-red-500 bg-zinc-900 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="relative border-b border-zinc-700 px-6 py-5 text-center">
-          <h1 className="pr-8 text-lg font-bold text-white sm:text-xl">
-            {safeTitle}
-          </h1>
-          <div className="mx-auto mt-2 h-0.5 w-12 rounded-full bg-red-500" />
-          <button
-            type="button"
-            onClick={handleClose}
-            className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-700 text-white transition hover:bg-zinc-600"
-            aria-label="Close"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+      {/* Couponly-style: white card, clean layout like coupon-01 */}
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden">
+        {/* Close X - top right */}
+        <button
+          type="button"
+          onClick={handleClose}
+          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 transition hover:bg-zinc-200 hover:text-zinc-900"
+          aria-label="Close"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
-        {/* Store card */}
-        <div className="relative mx-6 mt-6 flex justify-center">
-          <div className="absolute -left-4 -top-2 h-24 w-24 rounded-full bg-red-500/20 blur-2xl" />
-          <div className="relative rounded-xl border border-zinc-600 bg-white px-6 py-4 shadow-lg">
+        <div className="p-6 pt-5">
+          {/* Exclusive badge + Date - like Coupon 01 */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {trending && (
+              <span className="inline-block rounded bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
+                Exclusive
+              </span>
+            )}
+            {expiry && (
+              <span className="text-xs text-zinc-500">{expiry}</span>
+            )}
+          </div>
+
+          {/* Title */}
+          <h2 className="mb-4 pr-10 text-lg font-bold leading-snug text-zinc-900 sm:text-xl">
+            {safeTitle}
+          </h2>
+
+          {/* Store logo + name */}
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50/80 p-4">
             {storeLogo ? (
-              <div className="relative mx-auto h-14 w-28">
+              <div className="relative h-12 w-24 shrink-0">
                 <Image
                   src={storeLogo}
                   alt={storeName}
                   fill
-                  className="object-contain"
-                  sizes="112px"
+                  className="object-contain object-left"
+                  sizes="96px"
                   unoptimized
                 />
               </div>
-            ) : (
-              <p className="text-center font-semibold text-zinc-900">{storeName}</p>
-            )}
-            <p className="mt-2 text-center text-sm text-zinc-600">{storeName}</p>
+            ) : null}
+            <p className="font-medium text-zinc-700">{storeName}</p>
           </div>
-          <div className="absolute -bottom-2 -right-4 h-24 w-24 rounded-full bg-red-500/20 blur-2xl" />
-        </div>
 
-        {/* Code block */}
-        <div className="mx-6 mt-6 rounded-xl bg-zinc-800 px-4 py-5">
-          <p
-            role="button"
-            tabIndex={0}
-            onClick={handleCopyCode}
-            onKeyDown={(e) => e.key === "Enter" && handleCopyCode()}
-            className="cursor-pointer select-all text-center text-2xl font-bold tracking-wider text-white sm:text-3xl"
-          >
-            {code || "—"}
-          </p>
-          <p className="mt-2 text-center text-xs text-zinc-400">
-            {copied ? "✓ Copied!" : "CLICK THE CODE TO AUTO COPY"}
-          </p>
-        </div>
+          {/* Code block - for codes show code, for deals show "Deal" */}
+          <div className="mb-4 rounded-xl border-2 border-dashed border-amber-200 bg-amber-50/50 px-4 py-4">
+            {isCode && code ? (
+              <>
+                <p
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleCopyCode}
+                  onKeyDown={(e) => e.key === "Enter" && handleCopyCode()}
+                  className="cursor-pointer select-all text-center text-xl font-bold tracking-wider text-zinc-900 sm:text-2xl"
+                >
+                  {code}
+                </p>
+                <p className="mt-1 text-center text-xs text-zinc-500">
+                  {copied ? "✓ Copied!" : "Click to copy"}
+                </p>
+              </>
+            ) : (
+              <p className="text-center text-sm font-medium text-zinc-600">Deal – click Continue to Store to visit</p>
+            )}
+          </div>
 
-        {/* Actions */}
-        <div className="space-y-2 p-6 pt-4">
-          <a
-            href={trackingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full rounded-xl bg-red-600 py-3.5 text-center font-semibold text-white transition hover:bg-red-700"
-          >
-            Continue to Store
-          </a>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="block w-full rounded-xl border border-zinc-600 bg-zinc-800 py-3 text-center font-medium text-white transition hover:bg-zinc-700"
-          >
-            Close
-          </button>
-          <p className="text-center">
-            <Link href="/promotions" className="text-sm text-zinc-500 hover:text-red-400">
-              ← Back to SavingsHub4u
-            </Link>
-          </p>
+          {/* Continue to Store (opens in new tab, user stays here) + Close */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleContinueToStore}
+              className="w-full rounded-xl bg-amber-500 py-3.5 text-center font-semibold text-zinc-900 transition hover:bg-amber-400"
+            >
+              Continue to Store
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="w-full rounded-xl border border-zinc-300 bg-white py-3 text-center font-medium text-zinc-700 transition hover:bg-zinc-50"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

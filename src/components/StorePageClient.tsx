@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Store } from "@/types/store";
@@ -46,14 +46,32 @@ function isShippingCoupon(title: string): boolean {
   return /\b(free\s*)?(delivery|shipping)\b/.test(t) || /\bdelivery\b/.test(t) || /\bshipping\b/.test(t);
 }
 
-/** Badge: coupon.badgeLabel overrides; else UK store = Free Delivery, US = Free Shipping; else X% OFF. */
+/** Badge: badgeShipping (Free Shipping/Delivery) + badgeOffer (e.g. 20% OFF, $10 OFF); both can show in circle. Else legacy badgeLabel; else UK/US; else X% OFF. */
 function getBadgeForCoupon(
   dealTitle: string,
   countryCodes: string | undefined,
-  couponBadgeLabel?: "" | "free_shipping" | "free_delivery"
-): { type: "percent"; percent: number } | { type: "text"; line1: string } {
-  if (couponBadgeLabel === "free_shipping") return { type: "text", line1: "Free Shipping" };
-  if (couponBadgeLabel === "free_delivery") return { type: "text", line1: "Free Delivery" };
+  coupon: { badgeLabel?: string; badgeShipping?: string; badgeOffer?: string }
+): { type: "percent"; percent: number } | { type: "text"; line1: string; line2?: string } {
+  const shipping = (coupon.badgeShipping ?? "").trim();
+  const offer = (coupon.badgeOffer ?? "").trim();
+  const legacy = (coupon.badgeLabel ?? "").trim();
+
+  const hasShipping = shipping !== "";
+  const hasOffer = offer !== "";
+
+  if (hasShipping || hasOffer) {
+    const line1 = hasOffer ? offer : shipping;
+    const line2 = hasShipping && hasOffer ? shipping : undefined;
+    return { type: "text", line1, line2 };
+  }
+
+  if (legacy !== "") {
+    const lower = legacy.toLowerCase();
+    if (lower === "free_shipping") return { type: "text", line1: "Free Shipping" };
+    if (lower === "free_delivery") return { type: "text", line1: "Free Delivery" };
+    return { type: "text", line1: legacy };
+  }
+
   const codes = (countryCodes ?? "").toUpperCase().replace(/\s/g, "");
   const isUK = /\b(GB|UK)\b/.test(codes) || codes === "GB" || codes === "UK";
   const isUS = /\bUS\b/.test(codes) || codes === "US";
@@ -94,7 +112,34 @@ export default function StorePageClient({
     storeLogo: string;
     redirect: string;
     storeId: string;
+    expiry?: string;
+    isCode?: boolean;
+    trending?: boolean;
   } | null>(null);
+
+  // Open popup when URL has hash #o-<couponId> (e.g. /promotions/store-slug/#o-1047)
+  useEffect(() => {
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const match = hash.match(/^#o-(.+)$/);
+    if (!match) return;
+    const couponId = decodeURIComponent(match[1]);
+    const coupon = coupons.find((c) => c.id === couponId);
+    if (!coupon) return;
+    const href = coupon.link || visitUrl;
+    const isCode = coupon.couponType === "code";
+    const dealTitle = (coupon.couponTitle ?? "").trim() || (isCode ? `Use code ${coupon.couponCode || ""}` : "Deal");
+    setRevealingCoupon({
+      code: coupon.couponCode || "",
+      title: dealTitle,
+      storeName: storeInfo.name,
+      storeLogo: storeInfo.logoUrl || "",
+      redirect: href,
+      storeId: coupon.id,
+      expiry: formatExpiry(coupon.expiry),
+      isCode,
+      trending: coupon.trending === true,
+    });
+  }, [coupons, visitUrl, storeInfo.name, storeInfo.logoUrl]);
 
   const filtered =
     filter === "all"
@@ -127,7 +172,12 @@ export default function StorePageClient({
         <CouponRevealModal
           key={revealingCoupon.storeId}
           {...revealingCoupon}
-          onClose={() => setRevealingCoupon(null)}
+          onClose={() => {
+            setRevealingCoupon(null);
+            if (typeof window !== "undefined" && window.location.hash) {
+              history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
+          }}
           blurBackdrop
         />
       ) : null}
@@ -173,6 +223,12 @@ export default function StorePageClient({
                 <li>At checkout, paste the code in the promo or discount code box.</li>
                 <li>Click apply and complete your order to get the discount.</li>
               </ol>
+            </div>
+
+            {/* Why Trust Us */}
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-5 shadow-sm">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-zinc-800">Why Trust Us?</h3>
+              <p className="text-sm leading-relaxed text-zinc-600">{whyTrustUs}</p>
             </div>
           </div>
         </aside>
@@ -229,7 +285,11 @@ export default function StorePageClient({
                   ? `/api/click?storeId=${encodeURIComponent(c.id)}&redirect=${encodeURIComponent(href)}`
                   : href;
                 const dealTitle = (c.couponTitle ?? "").trim() || (isCode ? `Use code ${c.couponCode || ""}` : "Deal");
-                const badge = getBadgeForCoupon(dealTitle, storeInfo.countryCodes, c.badgeLabel);
+                const badge = getBadgeForCoupon(dealTitle, storeInfo.countryCodes, {
+                  badgeLabel: c.badgeLabel,
+                  badgeShipping: c.badgeShipping,
+                  badgeOffer: c.badgeOffer,
+                });
                 const percent = badge.type === "percent" ? badge.percent : 10;
                 const revealParams = new URLSearchParams({
                   code: c.couponCode || "",
@@ -240,7 +300,6 @@ export default function StorePageClient({
                   storeId: c.id,
                 });
                 const handleCouponClick = () => {
-                  setExtraClicks((prev) => ({ ...prev, [c.id]: (prev[c.id] ?? 0) + 1 }));
                   setRevealingCoupon({
                     code: c.couponCode || "",
                     title: dealTitle,
@@ -248,22 +307,33 @@ export default function StorePageClient({
                     storeLogo: storeInfo.logoUrl || "",
                     redirect: href,
                     storeId: c.id,
+                    expiry: expiryDate,
+                    isCode,
+                    trending: c.trending === true,
                   });
-                  window.open(`/coupon/reveal?${revealParams.toString()}`, "_blank", "noopener,noreferrer");
-                  window.open(clickUrl, "_blank", "noopener,noreferrer");
+                  // Update URL to #o-<id> so link can be shared (e.g. /promotions/store-slug/#o-1047)
+                  const hash = `#o-${encodeURIComponent(c.id)}`;
+                  if (typeof window !== "undefined") {
+                    history.replaceState(null, "", window.location.pathname + window.location.search + hash);
+                  }
+                  // Popup only – user stays on our site; "Continue to Store" in modal opens tracking link in new tab
                 };
                 const expiryDate = formatExpiry(c.expiry);
                 const clickCount = (initialClickCounts[c.id] ?? 0) + (extraClicks[c.id] ?? 0);
                 return (
                   <li
                     key={c.id}
+                    id={`o-${encodeURIComponent(c.id)}`}
                     className={`flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-md ${viewMode === "grid" ? "items-stretch gap-5 p-6" : "sm:flex-row sm:items-center sm:gap-6 sm:p-6"}`}
                   >
                     <div className="flex shrink-0 items-center justify-center">
                       <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 px-1 text-center text-white shadow-inner sm:h-28 sm:w-28">
                         {badge.type === "text" ? (
                           <>
-                            <span className="text-xs font-bold leading-tight sm:text-sm">{badge.line1}</span>
+                            <span className="text-lg font-bold leading-tight sm:text-xl">{badge.line1}</span>
+                            {badge.line2 ? (
+                              <span className="mt-0.5 text-[10px] font-semibold leading-tight opacity-95 sm:text-xs">{badge.line2}</span>
+                            ) : null}
                             <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide opacity-90 sm:text-[10px]">Savingshub4u</span>
                           </>
                         ) : (
@@ -284,9 +354,13 @@ export default function StorePageClient({
                           <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           {expiryDate}
                         </p>
-                        <h3 className="text-left font-bold text-zinc-900">
+                        <button
+                          type="button"
+                          onClick={handleCouponClick}
+                          className="w-full text-left font-bold text-zinc-900 transition hover:text-blue-600 cursor-pointer"
+                        >
                           {dealTitle && dealTitle !== "Deal" ? dealTitle : `${percent}% Off All Products - Limited Stock`}
-                        </h3>
+                        </button>
                         <p className="flex items-center gap-1 text-left text-xs text-zinc-500" title="Clicks">
                           <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122m2.122-10.606l2.12 2.122M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           {clickCount} click{clickCount !== 1 ? "s" : ""}
@@ -325,16 +399,6 @@ export default function StorePageClient({
             </ul>
           </section>
 
-          {/* Introduction */}
-          <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-zinc-900">
-              {displayName} Introduction
-            </h2>
-            <p className="text-sm leading-relaxed text-zinc-600">
-              {storeInfo.description || `Save more with verified ${displayName} coupon codes and promo deals. We update our list regularly and hand-test offers so you can shop with confidence.`}
-            </p>
-          </section>
-
           {/* Terms */}
           {moreInfo && (
             <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -347,30 +411,6 @@ export default function StorePageClient({
               />
             </section>
           )}
-
-          {/* Popular offers */}
-          <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-zinc-900">
-              Popular {displayName} offers
-            </h2>
-            <p className="text-sm text-zinc-600">
-              Our most used {displayName} coupons include free shipping, percentage-off sitewide, and first-order discounts. Check the list above for the latest active codes and deals.
-            </p>
-          </section>
-
-          {/* How To Use */}
-          <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-zinc-900">
-              How To Use {displayName} Coupons
-            </h2>
-            <ol className="list-decimal space-y-2 pl-5 text-sm text-zinc-600">
-              <li>Find a code or deal you want to use from the list above.</li>
-              <li>Click &quot;Get Code&quot; or &quot;Get Deal&quot; to reveal and copy the offer.</li>
-              <li>Visit the store website and add items to your cart.</li>
-              <li>At checkout, paste the code in the promo or discount code box, or follow the deal instructions.</li>
-              <li>Complete your purchase to save.</li>
-            </ol>
-          </section>
 
           {/* FAQ */}
           <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -393,24 +433,6 @@ export default function StorePageClient({
                 </details>
               ))}
             </div>
-          </section>
-
-          {/* How To Redeem */}
-          <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-zinc-900">
-              How To Redeem Your {displayName} Coupon Code
-            </h2>
-            <p className="text-sm leading-relaxed text-zinc-600">
-              After clicking &quot;Get Code&quot;, copy the code and go to {displayName}&apos;s website. Add items to your cart, proceed to checkout, and enter the code in the designated promo or discount code box. Click apply and complete your order to receive the discount.
-            </p>
-          </section>
-
-          {/* Why Trust Us */}
-          <section className="mt-10 rounded-xl border border-zinc-200 bg-zinc-50 p-6 shadow-sm">
-            <h2 className="mb-3 text-lg font-bold text-zinc-900">
-              Why Trust Us?
-            </h2>
-            <p className="text-sm leading-relaxed text-zinc-600">{whyTrustUs}</p>
           </section>
         </div>
       </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import PromotionsFooter from "@/components/PromotionsFooter";
 import PromotionsHeader from "@/components/PromotionsHeader";
+import PromotionsHeroSearch from "@/components/PromotionsHeroSearch";
 import CategoryIcon from "@/components/CategoryIcon";
 import Pagination from "@/components/Pagination";
 import { getStores, getCoupons, slugify, canonicalSlug, hasCouponData } from "@/lib/stores";
@@ -49,16 +50,30 @@ function buildUniqueStoresAndCouponCounts(enabled: Store[]) {
   return { uniqueStores, getCouponCount };
 }
 
+function filterStoresByQuery(stores: Store[], query: string): Store[] {
+  if (!query) return stores;
+  const q = query.trim().toLowerCase();
+  if (!q) return stores;
+  return stores.filter((s) => {
+    const name = (s.name ?? "").toLowerCase();
+    const sub = (s.subStoreName ?? "").toLowerCase();
+    const slug = (s.slug ?? slugify(s.name ?? "")).toLowerCase();
+    // Match stores that START with the search letter (e.g. "a" → Amazon, ASOS, not Texas Roadhouse)
+    return name.startsWith(q) || sub.startsWith(q) || slug.startsWith(q);
+  });
+}
+
 export default async function PromotionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; q?: string }>;
 }) {
-  const { page: pageStr } = await searchParams;
+  const { page: pageStr, q: searchQuery } = await searchParams;
   const currentPage = Math.max(1, parseInt(String(pageStr || "1"), 10) || 1);
   const [allRows, allCouponsFromTable] = await Promise.all([getStores(), getCoupons()]);
   const enabled = allRows.filter((s) => s.status !== "disable");
   const { uniqueStores, getCouponCount: getCouponCountFromStores } = buildUniqueStoresAndCouponCounts(enabled);
+  const searchFilteredStores = filterStoresByQuery(uniqueStores, searchQuery ?? "");
 
   const couponCountByKey = new Map<string, number>();
   const enabledCoupons = allCouponsFromTable.filter((c) => c.status !== "disable");
@@ -89,8 +104,8 @@ export default async function PromotionsPage({
     .sort((a, b) => getCouponCount(b) - getCouponCount(a))
     .slice(POPULAR_COUPONS_COUNT, POPULAR_COUPONS_COUNT + ENDING_SOON_COUNT);
 
-  const totalPages = Math.max(1, Math.ceil(uniqueStores.length / PER_PAGE));
-  const pageStores = uniqueStores.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(searchFilteredStores.length / PER_PAGE));
+  const pageStores = searchFilteredStores.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
   const { featuredPosts } = await getBlogData();
 
   return (
@@ -109,25 +124,7 @@ export default async function PromotionsPage({
                 Save big on your favorite brands with our exclusive coupons, discount codes, and deals.
               </p>
               <div className="mt-6 max-w-2xl">
-                <form action="/promotions" method="get" className="flex overflow-hidden rounded-2xl border-2 border-zinc-200 bg-white shadow-md transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-                  <span className="flex items-center pl-5 text-zinc-400" aria-hidden>
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </span>
-                  <input
-                    type="search"
-                    name="q"
-                    placeholder="Find coupon or store..."
-                    className="min-w-0 flex-1 bg-transparent py-4 pl-3 pr-4 text-base text-zinc-900 placeholder:text-zinc-400 focus:outline-none sm:py-5 sm:pl-4 sm:text-lg"
-                  />
-                  <button
-                    type="submit"
-                    className="shrink-0 bg-blue-600 px-6 font-semibold text-white transition hover:bg-blue-700 sm:px-8"
-                  >
-                    Search
-                  </button>
-                </form>
+                <PromotionsHeroSearch initialQuery={searchQuery ?? ""} />
               </div>
             </div>
             <div className="flex flex-1 items-end justify-center gap-4 lg:justify-end">
@@ -157,6 +154,70 @@ export default async function PromotionsPage({
       </section>
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+        {/* When search is active: show results right below hero so stores are visible immediately */}
+        {searchQuery?.trim() && (
+          <section id="search-results" className="mb-14 scroll-mt-6">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <h2 className="text-2xl font-bold tracking-tight text-zinc-900">
+                Search results for &quot;{searchQuery.trim()}&quot;
+              </h2>
+            </div>
+            {searchFilteredStores.length === 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-zinc-200 bg-amber-50/80 py-16 text-center">
+                <p className="mb-2 text-zinc-700">No stores found for &quot;{searchQuery.trim()}&quot;.</p>
+                <p className="mb-4 text-sm text-zinc-600">Try a different search or clear the search to see all stores.</p>
+                <Link href="/promotions" className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Show all stores</Link>
+              </div>
+            ) : (
+              <>
+                <p className="mb-4 text-sm text-zinc-500">
+                  Showing {(currentPage - 1) * PER_PAGE + 1}–{Math.min(currentPage * PER_PAGE, searchFilteredStores.length)} of {searchFilteredStores.length} stores
+                </p>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {pageStores.map((store) => (
+                    <article
+                      key={store.id}
+                      className="flex flex-col overflow-hidden rounded-xl border border-zinc-100 bg-white p-5 shadow-md transition hover:shadow-lg"
+                    >
+                      {store.logoUrl ? (
+                        <div className="relative mb-4 h-16 w-full">
+                          <Image
+                            src={store.logoUrl}
+                            alt={store.name}
+                            fill
+                            className="object-contain object-left"
+                            sizes="200px"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <h3 className="mb-4 text-lg font-bold text-zinc-900">{store.name}</h3>
+                      )}
+                      <p className="mb-4 flex-1 text-sm text-zinc-600 line-clamp-2">{store.description}</p>
+                      <div className="mb-3 text-xs text-zinc-500">Expiry: {store.expiry}</div>
+                      <Link
+                        href={`/promotions/${store.slug || slugify(store.name)}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        View coupons →
+                      </Link>
+                    </article>
+                  ))}
+                </div>
+                <Pagination
+                  basePath="/promotions"
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  searchParams={{
+                    ...(pageStr ? { page: pageStr } : {}),
+                    ...(searchQuery?.trim() ? { q: searchQuery.trim() } : {}),
+                  }}
+                />
+              </>
+            )}
+          </section>
+        )}
+
         {/* Popular Coupons */}
         <section className="mb-14">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -380,7 +441,7 @@ export default async function PromotionsPage({
               <input
                 type="email"
                 placeholder="Enter your email address"
-                className="min-w-0 flex-1 rounded-lg border border-white/30 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-blue-200 focus:border-white focus:outline-none focus:ring-1 focus:ring-white"
+                className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-500 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
               <button
                 type="submit"
@@ -392,7 +453,8 @@ export default async function PromotionsPage({
           </div>
         </section>
 
-        {/* All Coupons / Featured - paginated grid */}
+        {/* All Coupons - when no search; when search active, results show at top of main */}
+        {!searchQuery?.trim() && (
         <section className="mb-14">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-2xl font-bold tracking-tight text-zinc-900">
@@ -407,7 +469,7 @@ export default async function PromotionsPage({
           ) : (
             <>
               <p className="mb-4 text-sm text-zinc-500">
-                Showing {(currentPage - 1) * PER_PAGE + 1}–{Math.min(currentPage * PER_PAGE, uniqueStores.length)} of {uniqueStores.length} stores
+                Showing {(currentPage - 1) * PER_PAGE + 1}–{Math.min(currentPage * PER_PAGE, searchFilteredStores.length)} of {searchFilteredStores.length} stores
               </p>
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {pageStores.map((store) => (
@@ -444,11 +506,15 @@ export default async function PromotionsPage({
                 basePath="/promotions"
                 currentPage={currentPage}
                 totalPages={totalPages}
-                searchParams={pageStr ? { page: pageStr } : {}}
+                searchParams={{
+                  ...(pageStr ? { page: pageStr } : {}),
+                  ...(searchQuery?.trim() ? { q: searchQuery.trim() } : {}),
+                }}
               />
             </>
           )}
         </section>
+        )}
 
         {/* Featured Blogs */}
         <section className="mb-14">
@@ -488,8 +554,8 @@ export default async function PromotionsPage({
         </section>
       </main>
 
-      {/* Newsletter - full width above footer, no bottom gap */}
-      <section className="relative overflow-hidden bg-blue-600 px-4 py-14 sm:px-6 lg:px-8">
+      {/* Newsletter - 70% width (15% margin each side), no bottom gap */}
+      <section className="relative mx-[15%] overflow-hidden rounded-2xl bg-blue-600 px-4 py-14 sm:px-6 lg:px-8">
         <div className="absolute left-4 top-1/2 hidden h-32 w-32 -translate-y-1/2 opacity-30 lg:block" aria-hidden>
           <Image src="/Group 1171275124.svg" alt="" width={128} height={128} className="h-full w-full object-contain" unoptimized />
         </div>
@@ -507,7 +573,7 @@ export default async function PromotionsPage({
             <input
               type="email"
               placeholder="Email Address"
-              className="min-w-0 flex-1 rounded-lg border border-white/30 bg-white/10 px-4 py-3.5 text-sm text-white placeholder:text-blue-200 focus:border-white focus:outline-none focus:ring-1 focus:ring-white"
+              className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-4 py-3.5 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-500 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
             <button
               type="submit"

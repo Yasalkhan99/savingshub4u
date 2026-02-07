@@ -21,14 +21,18 @@ async function getStoresFromFile(): Promise<Store[]> {
 }
 
 export async function getStores(): Promise<Store[]> {
-  const supabase = getSupabase();
-  if (supabase) {
-    const { data: rows, error } = await supabase.from(SUPABASE_STORES_TABLE).select("data");
-    if (!error && rows?.length) {
-      const stores = rows.map((r: { data: Store }) => r.data).filter(Boolean);
-      stores.sort((a, b) => ((b.createdAt ?? "").localeCompare(a.createdAt ?? "")));
-      return stores;
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data: rows, error } = await supabase.from(SUPABASE_STORES_TABLE).select("data");
+      if (!error && rows?.length) {
+        const stores = rows.map((r: { data: Store }) => r.data).filter(Boolean);
+        stores.sort((a, b) => ((b.createdAt ?? "").localeCompare(a.createdAt ?? "")));
+        return stores;
+      }
     }
+  } catch {
+    // Connection closed / network error – fall back to file
   }
   return getStoresFromFile();
 }
@@ -44,14 +48,18 @@ async function getCouponsFromFile(): Promise<Store[]> {
 
 /** All coupons (from Supabase coupons table or data/coupons.json). */
 export async function getCoupons(): Promise<Store[]> {
-  const supabase = getSupabase();
-  if (supabase) {
-    const { data: rows, error } = await supabase.from(SUPABASE_COUPONS_TABLE).select("data");
-    if (!error && rows?.length) {
-      const coupons = rows.map((r: { data: Store }) => r.data).filter(Boolean);
-      coupons.sort((a, b) => ((b.createdAt ?? "").localeCompare(a.createdAt ?? "")));
-      return coupons;
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      const { data: rows, error } = await supabase.from(SUPABASE_COUPONS_TABLE).select("data");
+      if (!error && rows?.length) {
+        const coupons = rows.map((r: { data: Store }) => r.data).filter(Boolean);
+        coupons.sort((a, b) => ((b.createdAt ?? "").localeCompare(a.createdAt ?? "")));
+        return coupons;
+      }
     }
+  } catch {
+    // Connection closed / network error – fall back to file
   }
   return getCouponsFromFile();
 }
